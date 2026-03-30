@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}D&D Initiative{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <style>
+        body {
+            background-color: #1a1a2e;
+            color: #e0e0e0;
+            font-family: 'Georgia', serif;
+        }
+        .parchment {
+            background-color: #2a2a3e;
+            border: 1px solid #3a3a5e;
+        }
+        .gold-text {
+            color: #d4a843;
+        }
+        .narrative-text {
+            line-height: 1.8;
+        }
+        .action-input {
+            background-color: #2a2a3e;
+            border: 1px solid #3a3a5e;
+            color: #e0e0e0;
+        }
+        .action-input:focus {
+            border-color: #d4a843;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(212, 168, 67, 0.3);
+        }
+        .btn-action {
+            background-color: #8b0000;
+            color: #e0e0e0;
+            transition: background-color 0.2s;
+        }
+        .btn-action:hover {
+            background-color: #a50000;
+        }
+        .btn-action:disabled {
+            background-color: #4a4a4a;
+            cursor: wait;
+        }
+        .player-action {
+            color: #7eb8da;
+            font-style: italic;
+        }
+        .dm-narration {
+            color: #e0d5c0;
+        }
+        #narrative-panel {
+            scroll-behavior: smooth;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen">
+    {% block content %}{% endblock %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

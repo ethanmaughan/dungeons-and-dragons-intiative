@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}D&D Initiative — Home{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-16">
+    <div class="text-center mb-12">
+        <h1 class="text-5xl font-bold gold-text mb-4">D&D Initiative</h1>
+        <p class="text-xl text-gray-400">Your AI Dungeon Master awaits</p>
+    </div>
+
+    <!-- New Campaign Form -->
+    <div class="parchment rounded-lg p-8 mb-8">
+        <h2 class="text-2xl gold-text mb-6">Begin a New Adventure</h2>
+        <form action="/api/campaigns" method="post" class="space-y-4">
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Campaign Name</label>
+                <input type="text" name="name" value="The Lost Tavern"
+                       class="action-input w-full rounded px-3 py-2">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Setting</label>
+                <textarea name="setting" rows="2"
+                          class="action-input w-full rounded px-3 py-2">A classic fantasy world of swords, sorcery, and ancient ruins. The kingdom of Valdris teeters on the edge of war.</textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Your Name</label>
+                    <input type="text" name="player_name" value="Adventurer"
+                           class="action-input w-full rounded px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Character Name</label>
+                    <input type="text" name="character_name" value="Hero"
+                           class="action-input w-full rounded px-3 py-2">
+                </div>
+            </div>
+            <button type="submit" class="btn-action w-full rounded py-3 text-lg font-bold mt-4">
+                Start Adventure
+            </button>
+        </form>
+    </div>
+
+    <!-- Existing Campaigns -->
+    {% if campaigns %}
+    <div class="parchment rounded-lg p-8">
+        <h2 class="text-2xl gold-text mb-4">Continue an Adventure</h2>
+        {% for campaign in campaigns %}
+        <div class="border-b border-gray-700 py-3 last:border-0">
+            <span class="text-lg">{{ campaign.name }}</span>
+            <span class="text-gray-500 text-sm ml-2">
+                {% if campaign.sessions %}
+                    — <a href="/play/{{ campaign.sessions[-1].id }}" class="gold-text hover:underline">Resume</a>
+                {% endif %}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

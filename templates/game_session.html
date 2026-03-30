@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}{{ session.campaign.name }} — D&D Initiative{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-screen">
+    <!-- Header -->
+    <header class="parchment px-4 py-3 flex items-center justify-between border-b border-gray-700">
+        <div>
+            <h1 class="text-xl gold-text font-bold">{{ session.campaign.name }}</h1>
+            <span class="text-sm text-gray-400">Session {{ session.session_number }} — {{ game_state.game_mode | capitalize if game_state else 'Exploration' }}</span>
+        </div>
+        <div class="flex gap-4 text-sm">
+            {% for c in characters %}
+                {% if not c.is_npc and not c.is_enemy %}
+                <div class="parchment rounded px-3 py-1">
+                    <span class="gold-text">{{ c.character_name }}</span>
+                    <span class="text-red-400 ml-1">{{ c.hp_current }}/{{ c.hp_max }} HP</span>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </header>
+
+    <!-- Narrative Panel -->
+    <div id="narrative-panel" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        {% if not logs %}
+        <div class="dm-narration narrative-text text-center py-12">
+            <p class="text-gray-500 text-lg italic">The adventure begins... What do you do?</p>
+        </div>
+        {% endif %}
+
+        <div id="narrative-content">
+            {% for log in logs %}
+                {% include "partials/narrative_entry.html" %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Action Bar -->
+    <div class="parchment px-4 py-4 border-t border-gray-700">
+        <form id="action-form"
+              hx-post="/api/action/{{ session.id }}"
+              hx-target="#narrative-content"
+              hx-swap="beforeend"
+              hx-on::after-request="onActionComplete()"
+              hx-disabled-elt="#send-btn"
+              class="flex gap-3">
+            <input type="text" name="action" id="action-input"
+                   placeholder="What do you do? (e.g., I look around the tavern...)"
+                   class="action-input flex-1 rounded px-4 py-3 text-lg"
+                   autocomplete="off"
+                   required>
+            <button type="submit" id="send-btn"
+                    class="btn-action rounded px-6 py-3 text-lg font-bold">
+                Send
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function onActionComplete() {
+        // Clear the input
+        const input = document.getElementById('action-input');
+        input.value = '';
+        input.focus();
+
+        // Scroll to bottom of narrative
+        const panel = document.getElementById('narrative-panel');
+        panel.scrollTop = panel.scrollHeight;
+    }
+
+    // Scroll to bottom on page load
+    window.addEventListener('load', function() {
+        const panel = document.getElementById('narrative-panel');
+        panel.scrollTop = panel.scrollHeight;
+        document.getElementById('action-input').focus();
+    });
+
+    // Submit on Enter
+    document.getElementById('action-input').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.getElementById('action-form').requestSubmit();
+        }
+    });
+</script>
+{% endblock %}
