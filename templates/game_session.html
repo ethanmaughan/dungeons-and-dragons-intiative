@@ -26,7 +26,11 @@
     <div id="narrative-panel" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {% if not logs %}
         <div class="dm-narration narrative-text text-center py-12">
+            {% if game_state and game_state.game_mode == 'character_creation' %}
+            <p class="text-gray-500 text-lg italic">The DM is ready to help you create your character. Say hello!</p>
+            {% else %}
             <p class="text-gray-500 text-lg italic">The adventure begins... What do you do?</p>
+            {% endif %}
         </div>
         {% endif %}
 
@@ -55,6 +59,12 @@
                     class="btn-action rounded px-6 py-3 text-lg font-bold">
                 Send
             </button>
+            <button type="button" id="tts-toggle"
+                    onclick="toggleTTS()"
+                    class="rounded px-4 py-3 text-sm border border-gray-600 hover:border-yellow-600"
+                    title="Toggle voice narration">
+                🔇
+            </button>
         </form>
     </div>
 </div>
@@ -62,6 +72,41 @@
 
 {% block scripts %}
 <script>
+    let ttsEnabled = false;
+
+    function toggleTTS() {
+        ttsEnabled = !ttsEnabled;
+        const btn = document.getElementById('tts-toggle');
+        btn.textContent = ttsEnabled ? '🔊' : '🔇';
+        btn.classList.toggle('border-yellow-500', ttsEnabled);
+
+        // Stop any current speech when disabling
+        if (!ttsEnabled) {
+            speechSynthesis.cancel();
+        }
+    }
+
+    function speakNarration(text) {
+        if (!ttsEnabled || !text) return;
+
+        // Cancel any ongoing speech
+        speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.95;
+        utterance.pitch = 0.9;
+
+        // Try to pick a deeper/dramatic voice
+        const voices = speechSynthesis.getVoices();
+        const preferred = voices.find(v =>
+            v.name.includes('David') || v.name.includes('Daniel') ||
+            v.name.includes('Male') || v.name.includes('Google UK English Male')
+        );
+        if (preferred) utterance.voice = preferred;
+
+        speechSynthesis.speak(utterance);
+    }
+
     function onActionComplete() {
         // Clear the input
         const input = document.getElementById('action-input');
@@ -71,7 +116,18 @@
         // Scroll to bottom of narrative
         const panel = document.getElementById('narrative-panel');
         panel.scrollTop = panel.scrollHeight;
+
+        // Read the latest DM narration aloud
+        const entries = document.querySelectorAll('#narrative-content .dm-narration');
+        if (entries.length > 0) {
+            const latest = entries[entries.length - 1];
+            const text = latest.querySelector('.whitespace-pre-wrap')?.textContent;
+            speakNarration(text);
+        }
     }
+
+    // Load voices (some browsers load them async)
+    speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
 
     // Scroll to bottom on page load
     window.addEventListener('load', function() {

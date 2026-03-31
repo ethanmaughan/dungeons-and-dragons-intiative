@@ -1,61 +1,37 @@
 {% extends "base.html" %}
 
-{% block title %}D&D Initiative — Home{% endblock %}
+{% block title %}D&D Initiative — Your AI Dungeon Master{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto px-4 py-16">
-    <div class="text-center mb-12">
-        <h1 class="text-5xl font-bold gold-text mb-4">D&D Initiative</h1>
-        <p class="text-xl text-gray-400">Your AI Dungeon Master awaits</p>
+<div class="max-w-2xl mx-auto px-4 py-20 text-center">
+    <h1 class="text-6xl font-bold gold-text mb-6">D&D Initiative</h1>
+    <p class="text-xl text-gray-400 mb-12">Your AI Dungeon Master awaits. Create your character, gather your party, and embark on epic adventures.</p>
+
+    <div class="flex gap-4 justify-center">
+        <a href="/register" class="btn-action rounded px-8 py-4 text-xl font-bold">
+            Begin Your Journey
+        </a>
+        <a href="/login" class="btn-secondary rounded px-8 py-4 text-xl font-bold">
+            Login
+        </a>
     </div>
 
-    <!-- New Campaign Form -->
-    <div class="parchment rounded-lg p-8 mb-8">
-        <h2 class="text-2xl gold-text mb-6">Begin a New Adventure</h2>
-        <form action="/api/campaigns" method="post" class="space-y-4">
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">Campaign Name</label>
-                <input type="text" name="name" value="The Lost Tavern"
-                       class="action-input w-full rounded px-3 py-2">
-            </div>
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">Setting</label>
-                <textarea name="setting" rows="2"
-                          class="action-input w-full rounded px-3 py-2">A classic fantasy world of swords, sorcery, and ancient ruins. The kingdom of Valdris teeters on the edge of war.</textarea>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1">Your Name</label>
-                    <input type="text" name="player_name" value="Adventurer"
-                           class="action-input w-full rounded px-3 py-2">
-                </div>
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1">Character Name</label>
-                    <input type="text" name="character_name" value="Hero"
-                           class="action-input w-full rounded px-3 py-2">
-                </div>
-            </div>
-            <button type="submit" class="btn-action w-full rounded py-3 text-lg font-bold mt-4">
-                Start Adventure
-            </button>
-        </form>
-    </div>
-
-    <!-- Existing Campaigns -->
-    {% if campaigns %}
-    <div class="parchment rounded-lg p-8">
-        <h2 class="text-2xl gold-text mb-4">Continue an Adventure</h2>
-        {% for campaign in campaigns %}
-        <div class="border-b border-gray-700 py-3 last:border-0">
-            <span class="text-lg">{{ campaign.name }}</span>
-            <span class="text-gray-500 text-sm ml-2">
-                {% if campaign.sessions %}
-                    — <a href="/play/{{ campaign.sessions[-1].id }}" class="gold-text hover:underline">Resume</a>
-                {% endif %}
-            </span>
+    <div class="mt-16 grid grid-cols-3 gap-8 text-center">
+        <div class="parchment rounded-lg p-6">
+            <div class="text-3xl mb-3">&#9876;</div>
+            <h3 class="gold-text font-bold mb-2">AI Dungeon Master</h3>
+            <p class="text-sm text-gray-400">A fully autonomous DM that runs combat, NPCs, and storytelling</p>
         </div>
-        {% endfor %}
+        <div class="parchment rounded-lg p-6">
+            <div class="text-3xl mb-3">&#127922;</div>
+            <h3 class="gold-text font-bold mb-2">Real D&D Rules</h3>
+            <p class="text-sm text-gray-400">Server-side dice rolling and D&D 5e mechanics</p>
+        </div>
+        <div class="parchment rounded-lg p-6">
+            <div class="text-3xl mb-3">&#128214;</div>
+            <h3 class="gold-text font-bold mb-2">Official Campaigns</h3>
+            <p class="text-sm text-gray-400">Play Curse of Strahd, Lost Mine of Phandelver, and more</p>
+        </div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}

@@ -1,19 +1,35 @@
+import json
+import traceback
 from pathlib import Path
 
-import anthropic
+import ollama
 
-from server.config import ANTHROPIC_API_KEY
-
-# Load prompt template
+# Load prompt templates
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 CORE_PERSONA = (PROMPTS_DIR / "core_persona.txt").read_text()
+CHARACTER_CREATION_PERSONA = (PROMPTS_DIR / "character_creation_persona.txt").read_text()
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
+def build_system_prompt(campaign, game_state, characters, mode="play") -> str:
+    """Assemble the system prompt based on game mode."""
 
-def build_system_prompt(campaign, game_state, characters) -> str:
-    """Assemble the system prompt from the core persona and current game state."""
-    # Format character summaries
+    if mode == "character_creation":
+        # Build choices JSON from the character being created
+        pc = next((c for c in characters if not c.is_npc and not c.is_enemy), None)
+        choices = {}
+        if pc:
+            if pc.race != "Human" or pc.char_class != "Fighter":
+                choices["race"] = pc.race if pc.race != "Human" else None
+                choices["class"] = pc.char_class if pc.char_class != "Fighter" else None
+            if pc.character_name != "Unnamed Adventurer":
+                choices["name"] = pc.character_name
+
+        return CHARACTER_CREATION_PERSONA.format(
+            creation_step=game_state.creation_step or "race",
+            choices_json=json.dumps(choices) if choices else "None yet",
+        )
+
+    # Normal play mode
     party_lines = []
     for c in characters:
         if not c.is_npc and not c.is_enemy:
@@ -26,7 +42,6 @@ def build_system_prompt(campaign, game_state, characters) -> str:
 
     party_summary = "\n".join(party_lines) if party_lines else "No characters yet."
 
-    # Fill in the template
     prompt = CORE_PERSONA.format(
         campaign_name=campaign.name,
         setting=campaign.setting or "A classic fantasy world.",
@@ -42,9 +57,9 @@ def build_system_prompt(campaign, game_state, characters) -> str:
     return prompt
 
 
-def build_messages(action: str, recent_logs) -> list[dict]:
-    """Build the conversation history for Claude from recent game logs."""
-    messages = []
+def build_messages(system_prompt: str, action: str, recent_logs) -> list[dict]:
+    """Build the conversation history for Ollama from recent game logs."""
+    messages = [{"role": "system", "content": system_prompt}]
 
     for log in recent_logs:
         if log.action_text:
@@ -52,7 +67,6 @@ def build_messages(action: str, recent_logs) -> list[dict]:
         if log.narration_text:
             messages.append({"role": "assistant", "content": log.narration_text})
 
-    # Add the current player action
     messages.append({"role": "user", "content": action})
 
     return messages
@@ -64,16 +78,19 @@ async def process_player_action(
     game_state,
     characters,
     recent_logs,
+    mode: str = "play",
 ) -> str:
-    """Process a player action through Claude and return the DM's narration."""
-    system_prompt = build_system_prompt(campaign, game_state, characters)
-    messages = build_messages(action, recent_logs)
+    """Process a player action through Ollama and return the DM's narration."""
+    try:
+        system_prompt = build_system_prompt(campaign, game_state, characters, mode=mode)
+        messages = build_messages(system_prompt, action, recent_logs)
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1024,
-        system=system_prompt,
-        messages=messages,
-    )
+        response = ollama.chat(
+            model="mistral",
+            messages=messages,
+        )
 
-    return response.content[0].text
+        return response.message.content
+    except Exception as e:
+        traceback.print_exc()
+        return f"[Connection error: {e}]"

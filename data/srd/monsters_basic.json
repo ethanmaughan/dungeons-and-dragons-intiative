@@ -1,0 +1,122 @@
+{
+  "goblin": {
+    "name": "Goblin",
+    "hp": 7,
+    "ac": 15,
+    "speed": 30,
+    "str": 8, "dex": 14, "con": 10, "int": 10, "wis": 8, "cha": 8,
+    "attack_bonus": 4,
+    "damage": "1d6+2",
+    "cr": 0.25
+  },
+  "wolf": {
+    "name": "Wolf",
+    "hp": 11,
+    "ac": 13,
+    "speed": 40,
+    "str": 12, "dex": 15, "con": 12, "int": 3, "wis": 12, "cha": 6,
+    "attack_bonus": 4,
+    "damage": "2d4+2",
+    "cr": 0.25
+  },
+  "skeleton": {
+    "name": "Skeleton",
+    "hp": 13,
+    "ac": 13,
+    "speed": 30,
+    "str": 10, "dex": 14, "con": 15, "int": 6, "wis": 8, "cha": 5,
+    "attack_bonus": 4,
+    "damage": "1d6+2",
+    "cr": 0.25
+  },
+  "zombie": {
+    "name": "Zombie",
+    "hp": 22,
+    "ac": 8,
+    "speed": 20,
+    "str": 13, "dex": 6, "con": 16, "int": 3, "wis": 6, "cha": 5,
+    "attack_bonus": 3,
+    "damage": "1d6+1",
+    "cr": 0.25
+  },
+  "bandit": {
+    "name": "Bandit",
+    "hp": 11,
+    "ac": 12,
+    "speed": 30,
+    "str": 11, "dex": 12, "con": 12, "int": 10, "wis": 10, "cha": 10,
+    "attack_bonus": 3,
+    "damage": "1d6+1",
+    "cr": 0.125
+  },
+  "orc": {
+    "name": "Orc",
+    "hp": 15,
+    "ac": 13,
+    "speed": 30,
+    "str": 16, "dex": 12, "con": 16, "int": 7, "wis": 11, "cha": 10,
+    "attack_bonus": 5,
+    "damage": "1d12+3",
+    "cr": 0.5
+  },
+  "kobold": {
+    "name": "Kobold",
+    "hp": 5,
+    "ac": 12,
+    "speed": 30,
+    "str": 7, "dex": 15, "con": 9, "int": 8, "wis": 7, "cha": 8,
+    "attack_bonus": 4,
+    "damage": "1d4+2",
+    "cr": 0.125
+  },
+  "giant_spider": {
+    "name": "Giant Spider",
+    "hp": 26,
+    "ac": 14,
+    "speed": 30,
+    "str": 14, "dex": 16, "con": 12, "int": 2, "wis": 11, "cha": 4,
+    "attack_bonus": 5,
+    "damage": "1d8+3",
+    "cr": 1
+  },
+  "ogre": {
+    "name": "Ogre",
+    "hp": 59,
+    "ac": 11,
+    "speed": 40,
+    "str": 19, "dex": 8, "con": 16, "int": 5, "wis": 7, "cha": 7,
+    "attack_bonus": 6,
+    "damage": "2d8+4",
+    "cr": 2
+  },
+  "bugbear": {
+    "name": "Bugbear",
+    "hp": 27,
+    "ac": 16,
+    "speed": 30,
+    "str": 15, "dex": 14, "con": 13, "int": 8, "wis": 11, "cha": 9,
+    "attack_bonus": 4,
+    "damage": "2d8+2",
+    "cr": 1
+  },
+  "wight": {
+    "name": "Wight",
+    "hp": 45,
+    "ac": 14,
+    "speed": 30,
+    "str": 15, "dex": 14, "con": 16, "int": 10, "wis": 13, "cha": 15,
+    "attack_bonus": 4,
+    "damage": "1d8+2",
+    "cr": 3
+  },
+  "dire_wolf": {
+    "name": "Dire Wolf",
+    "hp": 37,
+    "ac": 14,
+    "speed": 50,
+    "str": 17, "dex": 15, "con": 15, "int": 3, "wis": 12, "cha": 7,
+    "attack_bonus": 5,
+    "damage": "2d6+3",
+    "cr": 1
+  }
+}

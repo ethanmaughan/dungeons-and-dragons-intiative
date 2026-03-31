@@ -6,6 +6,20 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from server.db.database import Base
 
 
+class Player(Base):
+    __tablename__ = "players"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    characters: Mapped[list["Character"]] = relationship(back_populates="player")
+
+
 class Campaign(Base):
     __tablename__ = "campaigns"
 
@@ -47,6 +61,7 @@ class Character(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), nullable=False)
+    player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
     player_name: Mapped[str] = mapped_column(String(100), default="DM")
     character_name: Mapped[str] = mapped_column(String(100), nullable=False)
     race: Mapped[str] = mapped_column(String(50), default="Human")
@@ -79,7 +94,11 @@ class Character(Base):
     npc_personality: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     npc_relationship: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    creation_complete: Mapped[bool] = mapped_column(Boolean, default=False)
+
     campaign: Mapped["Campaign"] = relationship(back_populates="characters")
+    player: Mapped["Player | None"] = relationship(back_populates="characters")
 
 
 class GameState(Base):
@@ -95,7 +114,7 @@ class GameState(Base):
         Text, default="You find yourself in a dimly lit tavern."
     )
     active_effects: Mapped[dict | None] = mapped_column(JSON, default=list)
-
+    creation_step: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     session: Mapped["Session"] = relationship(back_populates="game_state")
 

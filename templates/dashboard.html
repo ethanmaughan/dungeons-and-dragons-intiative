@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — D&D Initiative{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-8">
+        <h1 class="text-3xl gold-text font-bold">Welcome, {{ player.display_name }}</h1>
+    </div>
+
+    <!-- Characters -->
+    <div class="mb-10">
+        <h2 class="text-xl text-gray-300 mb-4">Your Characters</h2>
+        {% if characters %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for c in characters %}
+            <a href="/character/{{ c.id }}" class="parchment rounded-lg p-4 block hover:border-yellow-700 transition-colors">
+                <div class="flex items-center gap-3 mb-3">
+                    {% if c.avatar_url %}
+                    <img src="{{ c.avatar_url }}" alt="{{ c.character_name }}" class="w-12 h-12 rounded-full object-cover border border-gray-600">
+                    {% else %}
+                    <div class="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-xl gold-text">
+                        {{ c.character_name[0] }}
+                    </div>
+                    {% endif %}
+                    <div>
+                        <div class="gold-text font-bold">{{ c.character_name }}</div>
+                        <div class="text-sm text-gray-400">{{ c.race }} {{ c.char_class }} {{ c.level }}</div>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-400 mb-2">
+                    <span class="text-red-400">HP {{ c.hp_current }}/{{ c.hp_max }}</span>
+                    &middot; AC {{ c.ac }}
+                </div>
+                <div class="text-xs text-gray-500">
+                    Campaign: {{ c.campaign.name }}
+                </div>
+                {% if not c.creation_complete %}
+                <div class="mt-2">
+                    <span class="text-yellow-500 text-xs">Character creation in progress</span>
+                </div>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 italic">No characters yet. Start a new adventure below!</p>
+        {% endif %}
+    </div>
+
+    <!-- Active Campaigns -->
+    {% if active_sessions %}
+    <div class="mb-10">
+        <h2 class="text-xl text-gray-300 mb-4">Active Adventures</h2>
+        <div class="space-y-2">
+            {% for session in active_sessions %}
+            <div class="parchment rounded-lg p-4 flex items-center justify-between">
+                <div>
+                    <span class="gold-text font-bold">{{ session.campaign.name }}</span>
+                    <span class="text-gray-500 text-sm ml-2">Session {{ session.session_number }}</span>
+                </div>
+                <a href="/play/{{ session.id }}" class="btn-action rounded px-4 py-2 text-sm font-bold">
+                    Resume
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- New Adventure -->
+    <div class="parchment rounded-lg p-8">
+        <h2 class="text-2xl gold-text mb-6">Begin a New Adventure</h2>
+        <form action="/api/campaigns" method="post" class="space-y-4">
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Campaign</label>
+                <select name="official_campaign" id="campaign-select"
+                        class="action-input w-full rounded px-3 py-2"
+                        onchange="onCampaignSelect(this)">
+                    <option value="">-- Custom Homebrew --</option>
+                    <optgroup label="Starter Adventures">
+                        <option value="Lost Mine of Phandelver" data-setting="The Sword Coast near the town of Phandalin. A classic introductory adventure involving a lost mine, goblin ambushes, and a mysterious villain called the Black Spider.">Lost Mine of Phandelver</option>
+                        <option value="Dragon of Icespire Peak" data-setting="The frontier town of Phandalin, threatened by a young white dragon named Cryovain that has claimed Icespire Peak.">Dragon of Icespire Peak</option>
+                    </optgroup>
+                    <optgroup label="Classic Campaigns">
+                        <option value="Curse of Strahd" data-setting="The dark, gothic domain of Barovia, ruled by the vampire lord Strahd von Zarovich. A horror-themed adventure of dread and survival.">Curse of Strahd</option>
+                        <option value="Tomb of Annihilation" data-setting="The jungle peninsula of Chult, where a death curse is draining the life from those who have been raised from the dead.">Tomb of Annihilation</option>
+                        <option value="Storm King's Thunder" data-setting="The Sword Coast and the North, where the ordning of the giant races has been shattered.">Storm King's Thunder</option>
+                        <option value="Waterdeep: Dragon Heist" data-setting="The great city of Waterdeep, where factions vie for control of a hidden cache of 500,000 gold dragons.">Waterdeep: Dragon Heist</option>
+                        <option value="Waterdeep: Dungeon of the Mad Mage" data-setting="The mega-dungeon of Undermountain beneath Waterdeep, created by the mad wizard Halaster Blackcloak.">Waterdeep: Dungeon of the Mad Mage</option>
+                    </optgroup>
+                    <optgroup label="Epic Adventures">
+                        <option value="Hoard of the Dragon Queen" data-setting="The Sword Coast, where the Cult of the Dragon seeks to free Tiamat from the Nine Hells.">Hoard of the Dragon Queen</option>
+                        <option value="Rise of Tiamat" data-setting="The Cult of the Dragon's plan nears completion as Tiamat threatens to rise.">Rise of Tiamat</option>
+                        <option value="Out of the Abyss" data-setting="The Underdark, where demon lords have been summoned from the Abyss.">Out of the Abyss</option>
+                        <option value="Princes of the Apocalypse" data-setting="The Dessarin Valley, where four elemental cults seek to unleash devastating forces.">Princes of the Apocalypse</option>
+                    </optgroup>
+                    <optgroup label="Recent Adventures">
+                        <option value="Baldur's Gate: Descent into Avernus" data-setting="The city of Baldur's Gate and the first layer of the Nine Hells, Avernus.">Baldur's Gate: Descent into Avernus</option>
+                        <option value="Icewind Dale: Rime of the Frostmaiden" data-setting="The frozen tundra of Icewind Dale, trapped in perpetual winter by the frost goddess Auril.">Icewind Dale: Rime of the Frostmaiden</option>
+                        <option value="The Wild Beyond the Witchlight" data-setting="The Feywild, entered through a mysterious traveling carnival.">The Wild Beyond the Witchlight</option>
+                        <option value="Keys from the Golden Vault" data-setting="A collection of heist-themed adventures linked by the mysterious Golden Vault organization.">Keys from the Golden Vault</option>
+                        <option value="Vecna: Eve of Ruin" data-setting="A multiverse-spanning adventure to stop Vecna from remaking the multiverse.">Vecna: Eve of Ruin</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <div id="custom-fields">
+                <div class="mb-4">
+                    <label class="block text-sm text-gray-400 mb-1">Campaign Name</label>
+                    <input type="text" name="name" id="campaign-name" value="The Lost Tavern"
+                           class="action-input w-full rounded px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Setting</label>
+                    <textarea name="setting" id="campaign-setting" rows="2"
+                              class="action-input w-full rounded px-3 py-2">A classic fantasy world of swords, sorcery, and ancient ruins.</textarea>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Character Creation</label>
+                <div class="flex gap-3">
+                    <label class="flex-1 parchment rounded-lg p-3 cursor-pointer border-2 border-transparent has-[:checked]:border-yellow-600">
+                        <input type="radio" name="creation_mode" value="dm_guided" checked class="sr-only">
+                        <div class="gold-text font-bold text-sm">DM-Guided</div>
+                        <div class="text-xs text-gray-400 mt-1">The DM walks you through creating your character in conversation</div>
+                    </label>
+                    <label class="flex-1 parchment rounded-lg p-3 cursor-pointer border-2 border-transparent has-[:checked]:border-yellow-600">
+                        <input type="radio" name="creation_mode" value="quick_form" class="sr-only">
+                        <div class="gold-text font-bold text-sm">Quick Form</div>
+                        <div class="text-xs text-gray-400 mt-1">Pick race, class, and stats from a form</div>
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-action w-full rounded py-3 text-lg font-bold mt-4">
+                Start Adventure
+            </button>
+        </form>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    function onCampaignSelect(select) {
+        const nameInput = document.getElementById('campaign-name');
+        const settingInput = document.getElementById('campaign-setting');
+        const selected = select.options[select.selectedIndex];
+
+        if (select.value === '') {
+            nameInput.value = 'The Lost Tavern';
+            settingInput.value = 'A classic fantasy world of swords, sorcery, and ancient ruins.';
+            nameInput.readOnly = false;
+            settingInput.readOnly = false;
+            nameInput.classList.remove('opacity-60');
+            settingInput.classList.remove('opacity-60');
+        } else {
+            nameInput.value = select.value;
+            settingInput.value = selected.dataset.setting;
+            nameInput.readOnly = true;
+            settingInput.readOnly = true;
+            nameInput.classList.add('opacity-60');
+            settingInput.classList.add('opacity-60');
+        }
+    }
+</script>
+{% endblock %}
+{% endblock %}

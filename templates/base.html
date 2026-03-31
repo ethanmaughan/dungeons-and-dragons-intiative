@@ -44,6 +44,14 @@
             background-color: #4a4a4a;
             cursor: wait;
         }
+        .btn-secondary {
+            background-color: #3a3a5e;
+            color: #e0e0e0;
+            transition: background-color 0.2s;
+        }
+        .btn-secondary:hover {
+            background-color: #4a4a6e;
+        }
         .player-action {
             color: #7eb8da;
             font-style: italic;
@@ -58,6 +66,20 @@
     {% block head %}{% endblock %}
 </head>
 <body class="min-h-screen">
+    <!-- Nav Bar -->
+    <nav class="px-4 py-2 flex items-center justify-between border-b border-gray-800 text-sm">
+        <a href="/" class="gold-text font-bold text-lg">D&D Initiative</a>
+        <div class="flex items-center gap-4">
+            {% if player %}
+                <span class="text-gray-400">{{ player.display_name }}</span>
+                <a href="/dashboard" class="text-gray-300 hover:text-white">Dashboard</a>
+                <a href="/auth/logout" class="text-gray-400 hover:text-red-400">Logout</a>
+            {% else %}
+                <a href="/login" class="text-gray-300 hover:text-white">Login</a>
+                <a href="/register" class="gold-text hover:underline">Register</a>
+            {% endif %}
+        </div>
+    </nav>
     {% block content %}{% endblock %}
     {% block scripts %}{% endblock %}
 </body>

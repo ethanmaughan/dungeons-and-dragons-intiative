@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Register — D&D Initiative{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto px-4 py-16">
+    <div class="parchment rounded-lg p-8">
+        <h2 class="text-2xl gold-text mb-6 text-center">Join the Adventure</h2>
+
+        {% if error %}
+        <div class="bg-red-900/50 border border-red-700 rounded px-4 py-2 mb-4 text-red-300 text-sm">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form action="/auth/register" method="post" class="space-y-4">
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Username</label>
+                <input type="text" name="username" required autofocus
+                       class="action-input w-full rounded px-3 py-2"
+                       placeholder="Choose a username">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Display Name</label>
+                <input type="text" name="display_name"
+                       class="action-input w-full rounded px-3 py-2"
+                       placeholder="How others see you (optional)">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Password</label>
+                <input type="password" name="password" required minlength="4"
+                       class="action-input w-full rounded px-3 py-2"
+                       placeholder="At least 4 characters">
+            </div>
+            <button type="submit" class="btn-action w-full rounded py-3 text-lg font-bold">
+                Create Account
+            </button>
+        </form>
+
+        <p class="text-center text-gray-500 text-sm mt-6">
+            Already have an account? <a href="/login" class="gold-text hover:underline">Login</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
