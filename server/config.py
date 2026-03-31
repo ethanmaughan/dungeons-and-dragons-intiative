@@ -4,7 +4,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-DATABASE_URL = "sqlite:///data/game.db"
+# Use DATABASE_URL env var for production (PostgreSQL), fallback to SQLite for local dev
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/game.db")
 SECRET_KEY = os.getenv("SECRET_KEY", "dnd-initiative-dev-secret-change-in-prod")
 
 # AI backend: "ollama" (free, local) or "claude" (paid, better quality)
