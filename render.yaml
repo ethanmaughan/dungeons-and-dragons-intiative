@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: foray
+    runtime: docker
+    plan: free
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AI_BACKEND
+        value: claude
+      - key: SECRET_KEY
+        generateValue: true

@@ -23,6 +23,10 @@ data/game.db
 *.swp
 *.swo
 
+# Uploads
+static/uploads/avatars/*
+!static/uploads/avatars/.gitkeep
+
 # OS
 .DS_Store
 Thumbs.db
