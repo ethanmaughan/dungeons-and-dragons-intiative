@@ -42,7 +42,7 @@ def build_system_prompt(campaign, game_state, characters, mode="play") -> str:
         if not c.is_npc and not c.is_enemy:
             line = (
                 f"- {c.character_name} ({c.race} {c.char_class} {c.level}): "
-                f"HP {c.hp_current}/{c.hp_max}, AC {c.ac}, "
+                f"HP {c.hp_current}/{c.hp_max}, AC {c.ac}, XP {c.xp}, "
                 f"STR {c.str_score} DEX {c.dex_score} CON {c.con_score} "
                 f"INT {c.int_score} WIS {c.wis_score} CHA {c.cha_score}"
             )

@@ -54,6 +54,10 @@ Spellcasting:
 [SPELL:Hero:Fire Bolt:0] — Cast a cantrip (no slot consumed)
 When a player casts a spell, ALWAYS use the SPELL tag. The server tracks spell slots.
 
+Experience:
+[XP:50] — Award 50 XP to the player
+Award XP after combat victories, quest milestones, and clever problem-solving. The server handles level-up detection automatically.
+
 Resting:
 [REST:long] — Long rest: restore HP and all spell slots
 [REST:short] — Short rest

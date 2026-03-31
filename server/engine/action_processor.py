@@ -69,6 +69,8 @@ def process_dm_response(raw_text: str, characters: list, game_state, db) -> dict
                 replacement = _handle_spell(params, characters, state_changes)
             elif tag_type == "REST":
                 replacement = _handle_rest(params, characters, state_changes)
+            elif tag_type == "XP":
+                replacement = _handle_xp(params, characters, state_changes)
             else:
                 replacement = f"[{tag_type}:{match.group(2)}]"
         except Exception:
@@ -382,3 +384,44 @@ def _handle_rest(params: list, characters: list, state_changes: dict) -> str:
     else:
         state_changes["rest"] = {"type": "short"}
         return f"({pc.character_name} takes a short rest.)"
+
+
+def _handle_xp(params: list, characters: list, state_changes: dict) -> str:
+    """Handle [XP:amount] tags. Awards XP and checks for level up."""
+    from server.engine.leveling import check_level_up
+
+    if not params:
+        return ""
+
+    try:
+        amount = int(params[0])
+    except ValueError:
+        return "[invalid XP amount]"
+
+    pc = next((c for c in characters if not c.is_npc and not c.is_enemy), None)
+    if not pc:
+        return ""
+
+    pc.xp += amount
+    result_text = f"(+{amount} XP — Total: {pc.xp})"
+
+    state_changes.setdefault("xp_gained", []).append({
+        "character": pc.character_name,
+        "amount": amount,
+        "total": pc.xp,
+    })
+
+    # Check for level up
+    level_info = check_level_up(pc)
+    if level_info:
+        result_text += (
+            f"\n\n*** LEVEL UP! {pc.character_name} is now Level {level_info['new_level']}! ***"
+            f"\n(+{level_info['hp_increase']} HP — Max HP now {pc.hp_max})"
+        )
+        if level_info.get("new_spell_slots"):
+            slots_str = ", ".join(f"L{k}: {v}" for k, v in level_info["new_spell_slots"].items())
+            result_text += f"\n(New spell slots: {slots_str})"
+
+        state_changes["level_up"] = level_info
+
+    return result_text

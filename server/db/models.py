@@ -70,6 +70,7 @@ class Character(Base):
     race: Mapped[str] = mapped_column(String(50), default="Human")
     char_class: Mapped[str] = mapped_column(String(50), default="Fighter")
     level: Mapped[int] = mapped_column(Integer, default=1)
+    xp: Mapped[int] = mapped_column(Integer, default=0)
     hp_current: Mapped[int] = mapped_column(Integer, default=10)
     hp_max: Mapped[int] = mapped_column(Integer, default=10)
     ac: Mapped[int] = mapped_column(Integer, default=10)
