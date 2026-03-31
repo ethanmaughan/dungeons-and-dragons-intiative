@@ -104,6 +104,16 @@ All art, maps, and campaign stories are human-created. The AI executes them live
 - [ ] Sound effects and ambient music
 - [ ] Mobile-responsive design
 
+### Future — Community Marketplace
+- [ ] **The Foray Workshop** — a marketplace where creators upload and share content
+- [ ] Campaigns — community-written adventures with full story parameters
+- [ ] Maps — hand-drawn battle maps and world maps
+- [ ] Sprites/Tokens — character and monster art for the battle map
+- [ ] Music/Audio — ambient tracks, sound effects, battle themes
+- [ ] Rating/review system for uploaded content
+- [ ] Creator profiles and attribution
+- [ ] Free + paid content (creators can set a price, Foray takes a small cut)
+
 ## Legal
 
 This product uses game mechanics from the System Reference Document (SRD 5.2), available under the Creative Commons Attribution 4.0 International License (CC-BY-4.0).
