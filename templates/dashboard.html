@@ -14,33 +14,39 @@
         {% if characters %}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {% for c in characters %}
-            <a href="/character/{{ c.id }}" class="parchment rounded-lg p-4 block hover:border-yellow-700 transition-colors">
-                <div class="flex items-center gap-3 mb-3">
-                    {% if c.avatar_url %}
-                    <img src="{{ c.avatar_url }}" alt="{{ c.character_name }}" class="w-12 h-12 rounded-full object-cover border border-gray-600">
-                    {% else %}
-                    <div class="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-xl gold-text">
-                        {{ c.character_name[0] }}
+            <div class="parchment rounded-lg p-4 hover:border-yellow-700 transition-colors">
+                <a href="/character/{{ c.id }}" class="block">
+                    <div class="flex items-center gap-3 mb-3">
+                        {% if c.avatar_url %}
+                        <img src="{{ c.avatar_url }}" alt="{{ c.character_name }}" class="w-12 h-12 rounded-full object-cover border border-gray-600">
+                        {% else %}
+                        <div class="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-xl gold-text">
+                            {{ c.character_name[0] }}
+                        </div>
+                        {% endif %}
+                        <div>
+                            <div class="gold-text font-bold">{{ c.character_name }}</div>
+                            <div class="text-sm text-gray-400">{{ c.race }} {{ c.char_class }} {{ c.level }}</div>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-400 mb-2">
+                        <span class="text-red-400">HP {{ c.hp_current }}/{{ c.hp_max }}</span>
+                        &middot; AC {{ c.ac }}
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        Campaign: {{ c.campaign.name }}
+                    </div>
+                    {% if not c.creation_complete %}
+                    <div class="mt-2">
+                        <span class="text-yellow-500 text-xs">Character creation in progress</span>
                     </div>
                     {% endif %}
-                    <div>
-                        <div class="gold-text font-bold">{{ c.character_name }}</div>
-                        <div class="text-sm text-gray-400">{{ c.race }} {{ c.char_class }} {{ c.level }}</div>
-                    </div>
-                </div>
-                <div class="text-sm text-gray-400 mb-2">
-                    <span class="text-red-400">HP {{ c.hp_current }}/{{ c.hp_max }}</span>
-                    &middot; AC {{ c.ac }}
-                </div>
-                <div class="text-xs text-gray-500">
-                    Campaign: {{ c.campaign.name }}
-                </div>
-                {% if not c.creation_complete %}
-                <div class="mt-2">
-                    <span class="text-yellow-500 text-xs">Character creation in progress</span>
-                </div>
-                {% endif %}
-            </a>
+                </a>
+                <button onclick="showDeleteModal('character', {{ c.id }}, '{{ c.character_name }}')"
+                        class="text-red-800 hover:text-red-400 text-xs mt-2 transition-colors">
+                    Delete Character
+                </button>
+            </div>
             {% endfor %}
         </div>
         {% else %}
@@ -59,9 +65,15 @@
                     <span class="gold-text font-bold">{{ session.campaign.name }}</span>
                     <span class="text-gray-500 text-sm ml-2">Session {{ session.session_number }}</span>
                 </div>
-                <a href="/play/{{ session.id }}" class="btn-action rounded px-4 py-2 text-sm font-bold">
-                    Resume
-                </a>
+                <div class="flex items-center gap-3">
+                    <button onclick="showDeleteModal('campaign', {{ session.campaign.id }}, '{{ session.campaign.name }}')"
+                            class="text-red-800 hover:text-red-400 text-xs transition-colors">
+                        Delete
+                    </button>
+                    <a href="/play/{{ session.id }}" class="btn-action rounded px-4 py-2 text-sm font-bold">
+                        Resume
+                    </a>
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -141,6 +153,35 @@
     </div>
 </div>
 
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center hidden">
+    <div class="parchment rounded-lg p-6 max-w-sm w-full mx-4">
+        <h3 class="gold-text font-bold text-lg mb-2">Confirm Deletion</h3>
+        <p class="text-gray-400 text-sm mb-1">You are about to delete:</p>
+        <p class="text-white font-bold mb-4" id="delete-target-name"></p>
+        <p class="text-gray-400 text-sm mb-4">Enter your password to confirm. This cannot be undone.</p>
+
+        <form id="delete-form" method="post" class="space-y-3">
+            <input type="hidden" name="delete_type" id="delete-type">
+            <input type="hidden" name="delete_id" id="delete-id">
+            <div>
+                <input type="password" name="password" id="delete-password" required
+                       placeholder="Enter your password"
+                       class="action-input w-full rounded px-3 py-2">
+            </div>
+            <div id="delete-error" class="bg-red-900/50 border border-red-700 rounded px-3 py-2 text-red-300 text-sm hidden"></div>
+            <div class="flex gap-3">
+                <button type="button" onclick="hideDeleteModal()" class="btn-secondary flex-1 rounded py-2 text-sm font-bold">
+                    Cancel
+                </button>
+                <button type="submit" class="flex-1 rounded py-2 text-sm font-bold bg-red-800 text-white hover:bg-red-700 transition-colors">
+                    Delete
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {% block scripts %}
 <script>
     function onCampaignSelect(select) {
@@ -164,6 +205,58 @@
             settingInput.classList.add('opacity-60');
         }
     }
+
+    function showDeleteModal(type, id, name) {
+        document.getElementById('delete-type').value = type;
+        document.getElementById('delete-id').value = id;
+        document.getElementById('delete-target-name').textContent = name;
+        document.getElementById('delete-password').value = '';
+        document.getElementById('delete-error').classList.add('hidden');
+        document.getElementById('delete-modal').classList.remove('hidden');
+        document.getElementById('delete-password').focus();
+    }
+
+    function hideDeleteModal() {
+        document.getElementById('delete-modal').classList.add('hidden');
+    }
+
+    // Close modal on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') hideDeleteModal();
+    });
+
+    // Close modal on overlay click
+    document.getElementById('delete-modal').addEventListener('click', function(e) {
+        if (e.target === this) hideDeleteModal();
+    });
+
+    // Handle delete form submission
+    document.getElementById('delete-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const type = document.getElementById('delete-type').value;
+        const id = document.getElementById('delete-id').value;
+        const password = document.getElementById('delete-password').value;
+        const errorEl = document.getElementById('delete-error');
+
+        const formData = new FormData();
+        formData.append('password', password);
+
+        const response = await fetch(`/api/delete/${type}/${id}`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const data = await response.json();
+            errorEl.textContent = data.error || 'Incorrect password.';
+            errorEl.classList.remove('hidden');
+            document.getElementById('delete-password').value = '';
+            document.getElementById('delete-password').focus();
+        }
+    });
 </script>
 {% endblock %}
 {% endblock %}

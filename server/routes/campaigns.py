@@ -84,7 +84,7 @@ def create_campaign(
     game_state = GameState(
         session_id=session.id,
         game_mode="character_creation",
-        creation_step="race",
+        creation_step="greeting",
         environment_description="A wise sage sits across from you at a weathered oak table in a quiet corner of the tavern.",
     )
     db.add(game_state)

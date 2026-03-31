@@ -6,11 +6,7 @@ from server.db.database import get_db
 from server.db.models import GameLog, GameState
 from server.db.models import Session as GameSession
 from server.ai.orchestrator import process_player_action
-from server.engine.character import (
-    extract_character_choices,
-    determine_creation_step,
-    finalize_character,
-)
+from server.engine.character import finalize_character
 from server.engine.action_processor import process_dm_response
 
 templates = Jinja2Templates(directory="templates")
@@ -43,6 +39,39 @@ async def submit_action(
     turn_number = len(recent_logs) + 1
     is_character_creation = game_state and game_state.game_mode == "character_creation"
 
+    # Handle character creation step logic
+    if is_character_creation:
+        current_step = game_state.creation_step or "greeting"
+        pc = next((c for c in characters if not c.is_npc and not c.is_enemy), None)
+        player_answer = action.strip()
+
+        if pc:
+            # Store the player's answer for the current step
+            if current_step == "race":
+                pc.race = player_answer.title()
+            elif current_step == "class":
+                pc.char_class = player_answer.title()
+            elif current_step == "abilities":
+                pass  # Abilities are handled by finalize_character
+            elif current_step == "name":
+                pc.character_name = player_answer.title()
+            elif current_step == "confirm":
+                # Player confirmed — finalize and switch to exploration
+                current_choices = {
+                    "race": pc.race,
+                    "class": pc.char_class,
+                    "name": pc.character_name,
+                }
+                finalize_character(pc, current_choices, game_state)
+
+        # Advance to the next step (this is what the DM will present)
+        step_order = ["greeting", "race", "class", "abilities", "name", "confirm", "done"]
+        try:
+            idx = step_order.index(current_step)
+            game_state.creation_step = step_order[min(idx + 1, len(step_order) - 1)]
+        except ValueError:
+            game_state.creation_step = "race"
+
     # Call the DM orchestrator
     narration = await process_player_action(
         action=action,
@@ -50,52 +79,8 @@ async def submit_action(
         game_state=game_state,
         characters=characters,
         recent_logs=recent_logs,
-        mode="character_creation" if is_character_creation else "play",
+        mode="character_creation" if is_character_creation and game_state.game_mode == "character_creation" else "play",
     )
-
-    # Handle character creation extraction
-    if is_character_creation:
-        # Build conversation text for extraction
-        conversation_parts = []
-        for log in recent_logs:
-            if log.action_text:
-                conversation_parts.append(f"Player: {log.action_text}")
-            if log.narration_text:
-                conversation_parts.append(f"DM: {log.narration_text}")
-        conversation_parts.append(f"Player: {action}")
-        conversation_parts.append(f"DM: {narration}")
-        conversation_text = "\n".join(conversation_parts)
-
-        # Extract choices
-        choices = await extract_character_choices(conversation_text)
-
-        if choices:
-            # Find the player's character
-            pc = next((c for c in characters if not c.is_npc and not c.is_enemy), None)
-            if pc:
-                # Update character with extracted choices
-                if choices.get("race") and pc.race == "Human":
-                    pc.race = choices["race"]
-                if choices.get("class") and pc.char_class == "Fighter":
-                    pc.char_class = choices["class"]
-                if choices.get("name") and pc.character_name == "Unnamed Adventurer":
-                    pc.character_name = choices["name"]
-
-                # Determine current step
-                current_choices = {
-                    "race": pc.race if pc.race != "Human" else None,
-                    "class": pc.char_class if pc.char_class != "Fighter" else None,
-                    "name": pc.character_name if pc.character_name != "Unnamed Adventurer" else None,
-                }
-                new_step = determine_creation_step(current_choices)
-                game_state.creation_step = new_step
-
-                # Check if we're at confirm and player confirmed
-                if new_step == "confirm" and any(
-                    word in action.lower()
-                    for word in ["yes", "ready", "let's go", "begin", "start", "confirm"]
-                ):
-                    finalize_character(pc, current_choices, game_state)
 
     # Process action tags (dice rolls, HP changes, etc.) for non-creation modes
     dice_rolls = []

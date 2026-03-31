@@ -2,12 +2,19 @@ import json
 import traceback
 from pathlib import Path
 
-import ollama
+from server.config import AI_BACKEND, ANTHROPIC_API_KEY, CLAUDE_MODEL, OLLAMA_MODEL
 
 # Load prompt templates
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 CORE_PERSONA = (PROMPTS_DIR / "core_persona.txt").read_text()
 CHARACTER_CREATION_PERSONA = (PROMPTS_DIR / "character_creation_persona.txt").read_text()
+
+# Initialize the appropriate client
+if AI_BACKEND == "claude":
+    import anthropic
+    claude_client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+else:
+    import ollama
 
 
 def build_system_prompt(campaign, game_state, characters, mode="play") -> str:
@@ -58,7 +65,7 @@ def build_system_prompt(campaign, game_state, characters, mode="play") -> str:
 
 
 def build_messages(system_prompt: str, action: str, recent_logs) -> list[dict]:
-    """Build the conversation history for Ollama from recent game logs."""
+    """Build the conversation history from recent game logs."""
     messages = [{"role": "system", "content": system_prompt}]
 
     for log in recent_logs:
@@ -72,6 +79,30 @@ def build_messages(system_prompt: str, action: str, recent_logs) -> list[dict]:
     return messages
 
 
+async def _call_ollama(messages: list[dict]) -> str:
+    """Call Ollama (local) for a response."""
+    response = ollama.chat(
+        model=OLLAMA_MODEL,
+        messages=messages,
+    )
+    return response.message.content
+
+
+async def _call_claude(system_prompt: str, messages: list[dict]) -> str:
+    """Call Claude API for a response."""
+    # Claude uses a separate system parameter, not a system message
+    # Filter out the system message from the messages list
+    chat_messages = [m for m in messages if m["role"] != "system"]
+
+    response = await claude_client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=1024,
+        system=system_prompt,
+        messages=chat_messages,
+    )
+    return response.content[0].text
+
+
 async def process_player_action(
     action: str,
     campaign,
@@ -80,17 +111,15 @@ async def process_player_action(
     recent_logs,
     mode: str = "play",
 ) -> str:
-    """Process a player action through Ollama and return the DM's narration."""
+    """Process a player action and return the DM's narration."""
     try:
         system_prompt = build_system_prompt(campaign, game_state, characters, mode=mode)
         messages = build_messages(system_prompt, action, recent_logs)
 
-        response = ollama.chat(
-            model="mistral",
-            messages=messages,
-        )
-
-        return response.message.content
+        if AI_BACKEND == "claude":
+            return await _call_claude(system_prompt, messages)
+        else:
+            return await _call_ollama(messages)
     except Exception as e:
         traceback.print_exc()
         return f"[Connection error: {e}]"

@@ -2,25 +2,228 @@
 
 {% block title %}{{ session.campaign.name }} — D&D Initiative{% endblock %}
 
+{% block head %}
+<style>
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+    }
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    .sidebar-overlay {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+    }
+    .sidebar-overlay.open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="flex flex-col h-screen">
     <!-- Header -->
     <header class="parchment px-4 py-3 flex items-center justify-between border-b border-gray-700">
-        <div>
-            <h1 class="text-xl gold-text font-bold">{{ session.campaign.name }}</h1>
-            <span class="text-sm text-gray-400">Session {{ session.session_number }} — {{ game_state.game_mode | capitalize if game_state else 'Exploration' }}</span>
+        <div class="flex items-center gap-3">
+            <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white text-xl" title="Menu">
+                &#9776;
+            </button>
+            <div>
+                <h1 class="text-xl gold-text font-bold">{{ session.campaign.name }}</h1>
+                <span class="text-sm text-gray-400">Session {{ session.session_number }} — {{ game_state.game_mode | capitalize if game_state else 'Exploration' }}</span>
+            </div>
         </div>
         <div class="flex gap-4 text-sm">
             {% for c in characters %}
                 {% if not c.is_npc and not c.is_enemy %}
-                <div class="parchment rounded px-3 py-1">
+                <a href="/character/{{ c.id }}" class="parchment rounded px-3 py-1 hover:border-yellow-700 transition-colors">
                     <span class="gold-text">{{ c.character_name }}</span>
                     <span class="text-red-400 ml-1">{{ c.hp_current }}/{{ c.hp_max }} HP</span>
-                </div>
+                </a>
                 {% endif %}
             {% endfor %}
         </div>
     </header>
+
+    <!-- Sidebar Overlay -->
+    <div id="sidebar-overlay" class="sidebar-overlay fixed inset-0 bg-black/50 z-40" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar fixed top-0 left-0 h-full w-72 parchment z-50 border-r border-gray-700 overflow-y-auto">
+        <div class="p-4">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="gold-text font-bold text-lg">Menu</h2>
+                <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white text-xl">&times;</button>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="space-y-1 mb-6">
+                <a href="/dashboard" class="block px-3 py-2 rounded text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors">
+                    &#127968; Dashboard
+                </a>
+                {% for c in characters %}
+                    {% if not c.is_npc and not c.is_enemy %}
+                    <a href="/character/{{ c.id }}" class="block px-3 py-2 rounded text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors">
+                        &#128100; {{ c.character_name }}
+                    </a>
+                    {% endif %}
+                {% endfor %}
+            </nav>
+
+            <!-- Party -->
+            <div class="border-t border-gray-700 pt-4 mb-6">
+                <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Party</h3>
+                {% for c in characters %}
+                    {% if not c.is_npc and not c.is_enemy %}
+                    <div class="mb-3">
+                        <div class="flex items-center justify-between">
+                            <span class="gold-text text-sm font-bold">{{ c.character_name }}</span>
+                            <span class="text-xs text-gray-500">{{ c.race }} {{ c.char_class }}</span>
+                        </div>
+                        <div class="mt-1 bg-gray-800 rounded-full h-2 overflow-hidden">
+                            {% set hp_pct = (c.hp_current / c.hp_max * 100) if c.hp_max > 0 else 0 %}
+                            <div class="h-full rounded-full {% if hp_pct > 50 %}bg-green-600{% elif hp_pct > 25 %}bg-yellow-600{% else %}bg-red-600{% endif %}"
+                                 style="width: {{ hp_pct }}%"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-0.5">{{ c.hp_current }}/{{ c.hp_max }} HP &middot; AC {{ c.ac }}</div>
+                        {% if c.conditions %}
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            {% for cond in c.conditions %}
+                            <span class="bg-red-900/50 text-red-300 text-xs px-1.5 py-0.5 rounded">{{ cond }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                {% endfor %}
+
+            </div>
+
+            <!-- Character Sheet -->
+            {% for c in characters %}
+                {% if not c.is_npc and not c.is_enemy %}
+                <div class="border-t border-gray-700 pt-4 mb-6">
+                    <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Character Sheet</h3>
+
+                    <!-- Combat Stats -->
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                        <div class="text-center parchment rounded p-1.5">
+                            <div class="text-lg font-bold text-red-400">{{ c.hp_current }}/{{ c.hp_max }}</div>
+                            <div class="text-xs text-gray-500">HP</div>
+                        </div>
+                        <div class="text-center parchment rounded p-1.5">
+                            <div class="text-lg font-bold gold-text">{{ c.ac }}</div>
+                            <div class="text-xs text-gray-500">AC</div>
+                        </div>
+                        <div class="text-center parchment rounded p-1.5">
+                            <div class="text-lg font-bold text-blue-400">+{{ c.proficiency_bonus }}</div>
+                            <div class="text-xs text-gray-500">Prof</div>
+                        </div>
+                    </div>
+
+                    <!-- Ability Scores -->
+                    <div class="grid grid-cols-6 gap-1 mb-3">
+                        {% set abilities = [
+                            ("STR", c.str_score),
+                            ("DEX", c.dex_score),
+                            ("CON", c.con_score),
+                            ("INT", c.int_score),
+                            ("WIS", c.wis_score),
+                            ("CHA", c.cha_score)
+                        ] %}
+                        {% for name, score in abilities %}
+                        <div class="text-center">
+                            <div class="text-xs text-gray-500">{{ name }}</div>
+                            <div class="text-sm font-bold">{{ score }}</div>
+                            <div class="text-xs gold-text">
+                                {% set mod = (score - 10) // 2 %}{% if mod >= 0 %}+{% endif %}{{ mod }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Spells -->
+                    {% if c.spells %}
+                    <div class="mb-3">
+                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Spells</h4>
+                        <div class="space-y-0.5">
+                            {% for spell in c.spells %}
+                            <div class="text-xs text-purple-300">{{ spell }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Inventory -->
+                    <div class="mb-3">
+                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Inventory</h4>
+                        {% if c.inventory %}
+                        <div class="space-y-0.5">
+                            {% for item in c.inventory %}
+                            <div class="text-xs text-gray-300">{{ item }}</div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-xs text-gray-600 italic">Empty</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Features -->
+                    {% if c.features %}
+                    <div class="mb-3">
+                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Features</h4>
+                        <div class="space-y-0.5">
+                            {% for feat in c.features %}
+                            <div class="text-xs text-gray-300">{{ feat }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Conditions -->
+                    {% if c.conditions %}
+                    <div class="mb-3">
+                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Conditions</h4>
+                        <div class="flex flex-wrap gap-1">
+                            {% for cond in c.conditions %}
+                            <span class="bg-red-900/50 text-red-300 text-xs px-1.5 py-0.5 rounded">{{ cond }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Spell Slots -->
+                    {% if c.spell_slots %}
+                    <div class="mb-3">
+                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Spell Slots</h4>
+                        <div class="space-y-0.5">
+                            {% for level, slots in c.spell_slots.items() %}
+                            <div class="text-xs text-gray-400">Lvl {{ level }}: {{ slots }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% endfor %}
+
+            <!-- Game Info -->
+            <div class="border-t border-gray-700 pt-4">
+                <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Game Info</h3>
+                <div class="text-sm space-y-1">
+                    <div class="text-gray-400">Campaign: <span class="text-gray-300">{{ session.campaign.name }}</span></div>
+                    <div class="text-gray-400">Session: <span class="text-gray-300">#{{ session.session_number }}</span></div>
+                    <div class="text-gray-400">Mode: <span class="text-gray-300">{{ game_state.game_mode | capitalize if game_state else 'Exploration' }}</span></div>
+                    {% if game_state and game_state.game_mode == 'combat' %}
+                    <div class="text-gray-400">Round: <span class="text-gray-300">{{ game_state.round_number }}</span></div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Narrative Panel -->
     <div id="narrative-panel" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
@@ -51,7 +254,7 @@
               hx-disabled-elt="#send-btn"
               class="flex gap-3">
             <input type="text" name="action" id="action-input"
-                   placeholder="What do you do? (e.g., I look around the tavern...)"
+                   placeholder="{% if game_state and game_state.game_mode == 'character_creation' %}Say hello to begin character creation...{% elif game_state and game_state.game_mode == 'combat' %}It's your turn! Describe your action...{% else %}What do you do?{% endif %}"
                    class="action-input flex-1 rounded px-4 py-3 text-lg"
                    autocomplete="off"
                    required>
@@ -73,6 +276,13 @@
 {% block scripts %}
 <script>
     let ttsEnabled = false;
+    let sidebarOpen = false;
+
+    function toggleSidebar() {
+        sidebarOpen = !sidebarOpen;
+        document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
+        document.getElementById('sidebar-overlay').classList.toggle('open', sidebarOpen);
+    }
 
     function toggleTTS() {
         ttsEnabled = !ttsEnabled;
@@ -80,7 +290,6 @@
         btn.textContent = ttsEnabled ? '🔊' : '🔇';
         btn.classList.toggle('border-yellow-500', ttsEnabled);
 
-        // Stop any current speech when disabling
         if (!ttsEnabled) {
             speechSynthesis.cancel();
         }
@@ -89,14 +298,12 @@
     function speakNarration(text) {
         if (!ttsEnabled || !text) return;
 
-        // Cancel any ongoing speech
         speechSynthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 0.95;
         utterance.pitch = 0.9;
 
-        // Try to pick a deeper/dramatic voice
         const voices = speechSynthesis.getVoices();
         const preferred = voices.find(v =>
             v.name.includes('David') || v.name.includes('Daniel') ||
@@ -108,16 +315,13 @@
     }
 
     function onActionComplete() {
-        // Clear the input
         const input = document.getElementById('action-input');
         input.value = '';
         input.focus();
 
-        // Scroll to bottom of narrative
         const panel = document.getElementById('narrative-panel');
         panel.scrollTop = panel.scrollHeight;
 
-        // Read the latest DM narration aloud
         const entries = document.querySelectorAll('#narrative-content .dm-narration');
         if (entries.length > 0) {
             const latest = entries[entries.length - 1];
@@ -126,21 +330,25 @@
         }
     }
 
-    // Load voices (some browsers load them async)
     speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
 
-    // Scroll to bottom on page load
     window.addEventListener('load', function() {
         const panel = document.getElementById('narrative-panel');
         panel.scrollTop = panel.scrollHeight;
         document.getElementById('action-input').focus();
     });
 
-    // Submit on Enter
     document.getElementById('action-input').addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             document.getElementById('action-form').requestSubmit();
+        }
+    });
+
+    // Close sidebar on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sidebarOpen) {
+            toggleSidebar();
         }
     });
 </script>
