@@ -34,30 +34,50 @@ def dashboard(request: Request, db: DBSession = Depends(get_db)):
 
     characters = (
         db.query(Character)
-        .filter(Character.player_id == player.id)
+        .filter(Character.player_id == player.id, Character.is_enemy == False)
         .all()
     )
 
-    # Find active sessions for this player's characters
+    # Get campaigns the player owns or has characters in
+    owned_campaigns = db.query(Campaign).filter(Campaign.owner_id == player.id).all()
+    assigned_campaign_ids = {c.campaign_id for c in characters if c.campaign_id}
+    assigned_campaigns = (
+        db.query(Campaign).filter(Campaign.id.in_(assigned_campaign_ids)).all()
+        if assigned_campaign_ids else []
+    )
+    all_campaigns = list({c.id: c for c in owned_campaigns + assigned_campaigns}.values())
+
+    # Find active sessions
     active_sessions = []
-    for c in characters:
+    for campaign in all_campaigns:
         sessions = (
             db.query(GameSession)
-            .filter(
-                GameSession.campaign_id == c.campaign_id,
-                GameSession.status == "active",
-            )
+            .filter(GameSession.campaign_id == campaign.id, GameSession.status == "active")
             .all()
         )
-        for s in sessions:
-            if s not in active_sessions:
-                active_sessions.append(s)
+        active_sessions.extend(sessions)
+
+    # Unassigned characters (for the assign dropdown)
+    unassigned_chars = [c for c in characters if c.campaign_id is None and c.creation_complete]
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "player": player,
         "characters": characters,
+        "campaigns": all_campaigns,
         "active_sessions": active_sessions,
+        "unassigned_chars": unassigned_chars,
+    })
+
+
+@router.get("/character/create")
+def character_create_page(request: Request, db: DBSession = Depends(get_db)):
+    player = get_current_player(request, db)
+    if not player:
+        return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse("character_create.html", {
+        "request": request,
+        "player": player,
     })
 
 
@@ -100,18 +120,26 @@ def character_profile(request: Request, character_id: int, db: DBSession = Depen
     if not character or character.player_id != player.id:
         return RedirectResponse(url="/dashboard", status_code=303)
 
-    sessions = (
-        db.query(GameSession)
-        .filter(GameSession.campaign_id == character.campaign_id)
-        .order_by(GameSession.session_number.desc())
-        .all()
-    )
+    sessions = []
+    if character.campaign_id:
+        sessions = (
+            db.query(GameSession)
+            .filter(GameSession.campaign_id == character.campaign_id)
+            .order_by(GameSession.session_number.desc())
+            .all()
+        )
+
+    # Get campaigns for assign dropdown (if unassigned)
+    available_campaigns = []
+    if not character.campaign_id:
+        available_campaigns = db.query(Campaign).filter(Campaign.owner_id == player.id).all()
 
     return templates.TemplateResponse("character_profile.html", {
         "request": request,
         "player": player,
         "character": character,
         "sessions": sessions,
+        "available_campaigns": available_campaigns,
     })
 
 
@@ -132,7 +160,6 @@ async def upload_avatar(
         return RedirectResponse(url="/dashboard", status_code=303)
 
     if avatar_file and avatar_file.filename:
-        # Save uploaded file
         ext = avatar_file.filename.rsplit(".", 1)[-1] if "." in avatar_file.filename else "png"
         filename = f"{uuid.uuid4().hex}.{ext}"
         filepath = f"static/uploads/avatars/{filename}"

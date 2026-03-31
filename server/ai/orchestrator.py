@@ -40,12 +40,23 @@ def build_system_prompt(campaign, game_state, characters, mode="play") -> str:
     party_lines = []
     for c in characters:
         if not c.is_npc and not c.is_enemy:
-            party_lines.append(
+            line = (
                 f"- {c.character_name} ({c.race} {c.char_class} {c.level}): "
                 f"HP {c.hp_current}/{c.hp_max}, AC {c.ac}, "
                 f"STR {c.str_score} DEX {c.dex_score} CON {c.con_score} "
                 f"INT {c.int_score} WIS {c.wis_score} CHA {c.cha_score}"
             )
+            if c.spell_slots_current:
+                slots_str = ", ".join(
+                    f"L{k}: {v}/{c.spell_slots.get(k, '?')}"
+                    for k, v in c.spell_slots_current.items()
+                )
+                line += f"\n  Spell Slots: {slots_str}"
+            if c.spells:
+                line += f"\n  Spells: {', '.join(c.spells)}"
+            if c.inventory:
+                line += f"\n  Inventory: {', '.join(c.inventory[:10])}"
+            party_lines.append(line)
 
     party_summary = "\n".join(party_lines) if party_lines else "No characters yet."
 

@@ -18,12 +18,14 @@ class Player(Base):
     )
 
     characters: Mapped[list["Character"]] = relationship(back_populates="player")
+    campaigns: Mapped[list["Campaign"]] = relationship(back_populates="owner")
 
 
 class Campaign(Base):
     __tablename__ = "campaigns"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     synopsis: Mapped[str | None] = mapped_column(Text, default="")
     setting: Mapped[str | None] = mapped_column(Text, default="")
@@ -34,6 +36,7 @@ class Campaign(Base):
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
 
+    owner: Mapped["Player | None"] = relationship(back_populates="campaigns")
     sessions: Mapped[list["Session"]] = relationship(back_populates="campaign")
     characters: Mapped[list["Character"]] = relationship(back_populates="campaign")
 
@@ -60,9 +63,9 @@ class Character(Base):
     __tablename__ = "characters"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), nullable=False)
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True)
     player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
-    player_name: Mapped[str] = mapped_column(String(100), default="DM")
+    player_name: Mapped[str] = mapped_column(String(100), default="GM")
     character_name: Mapped[str] = mapped_column(String(100), nullable=False)
     race: Mapped[str] = mapped_column(String(50), default="Human")
     char_class: Mapped[str] = mapped_column(String(50), default="Fighter")
@@ -86,6 +89,7 @@ class Character(Base):
     inventory: Mapped[dict | None] = mapped_column(JSON, default=list)
     spells: Mapped[dict | None] = mapped_column(JSON, default=list)
     spell_slots: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    spell_slots_current: Mapped[dict | None] = mapped_column(JSON, default=dict)
     conditions: Mapped[dict | None] = mapped_column(JSON, default=list)
     death_saves: Mapped[dict | None] = mapped_column(JSON, default=lambda: {"successes": 0, "failures": 0})
 
@@ -97,7 +101,7 @@ class Character(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     creation_complete: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    campaign: Mapped["Campaign"] = relationship(back_populates="characters")
+    campaign: Mapped["Campaign | None"] = relationship(back_populates="characters")
     player: Mapped["Player | None"] = relationship(back_populates="characters")
 
 

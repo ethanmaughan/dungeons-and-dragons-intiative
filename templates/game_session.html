@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ session.campaign.name }} — D&D Initiative{% endblock %}
+{% block title %}{{ session.campaign.name }} — Foray{% endblock %}
 
 {% block head %}
 <style>
@@ -230,7 +230,7 @@
         {% if not logs %}
         <div class="dm-narration narrative-text text-center py-12">
             {% if game_state and game_state.game_mode == 'character_creation' %}
-            <p class="text-gray-500 text-lg italic">The DM is ready to help you create your character. Say hello!</p>
+            <p class="text-gray-500 text-lg italic">The Game Master is ready to help you create your character. Say hello!</p>
             {% else %}
             <p class="text-gray-500 text-lg italic">The adventure begins... What do you do?</p>
             {% endif %}

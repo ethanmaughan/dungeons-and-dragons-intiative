@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Create Character — Foray{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+    <a href="/dashboard" class="text-gray-400 hover:text-white text-sm mb-4 inline-block">&larr; Back to Dashboard</a>
+
+    <div class="parchment rounded-lg p-8">
+        <h2 class="text-2xl gold-text mb-6">Create Your Character</h2>
+
+        <form action="/api/characters" method="post" enctype="multipart/form-data" class="space-y-5">
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Character Name</label>
+                <input type="text" name="character_name" required
+                       class="action-input w-full rounded px-3 py-2 text-lg"
+                       placeholder="What name do you go by?">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Race</label>
+                    <select name="race" class="action-input w-full rounded px-3 py-2">
+                        <option value="Human">Human</option>
+                        <option value="Elf">Elf</option>
+                        <option value="High Elf">High Elf</option>
+                        <option value="Wood Elf">Wood Elf</option>
+                        <option value="Dark Elf">Dark Elf</option>
+                        <option value="Dwarf">Dwarf</option>
+                        <option value="Hill Dwarf">Hill Dwarf</option>
+                        <option value="Mountain Dwarf">Mountain Dwarf</option>
+                        <option value="Halfling">Halfling</option>
+                        <option value="Lightfoot Halfling">Lightfoot Halfling</option>
+                        <option value="Stout Halfling">Stout Halfling</option>
+                        <option value="Dragonborn">Dragonborn</option>
+                        <option value="Tiefling">Tiefling</option>
+                        <option value="Half-Orc">Half-Orc</option>
+                        <option value="Gnome">Gnome</option>
+                        <option value="Half-Elf">Half-Elf</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Class</label>
+                    <select name="char_class" class="action-input w-full rounded px-3 py-2">
+                        <option value="Fighter">Fighter</option>
+                        <option value="Wizard">Wizard</option>
+                        <option value="Rogue">Rogue</option>
+                        <option value="Cleric">Cleric</option>
+                        <option value="Ranger">Ranger</option>
+                        <option value="Paladin">Paladin</option>
+                        <option value="Barbarian">Barbarian</option>
+                        <option value="Bard">Bard</option>
+                        <option value="Druid">Druid</option>
+                        <option value="Monk">Monk</option>
+                        <option value="Sorcerer">Sorcerer</option>
+                        <option value="Warlock">Warlock</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Character Avatar</label>
+                <div class="space-y-2">
+                    <input type="file" name="avatar_file" accept="image/*"
+                           class="text-sm text-gray-400 w-full">
+                    <div class="text-xs text-gray-600 text-center">— or paste an image URL —</div>
+                    <input type="text" name="avatar_url" placeholder="https://example.com/my-character.png"
+                           class="action-input w-full rounded px-3 py-2 text-sm">
+                </div>
+            </div>
+
+            <button type="submit" class="btn-action w-full rounded py-3 text-lg font-bold mt-2">
+                Create Character
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

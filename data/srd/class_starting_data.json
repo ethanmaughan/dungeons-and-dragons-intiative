@@ -1,0 +1,86 @@
+{
+  "barbarian": {
+    "equipment": ["Greataxe", "Handaxe", "Handaxe", "Explorer's Pack", "Javelin", "Javelin", "Javelin", "Javelin"],
+    "features": ["Rage", "Unarmored Defense"],
+    "cantrips": [],
+    "spells": [],
+    "spell_slots": {}
+  },
+  "bard": {
+    "equipment": ["Rapier", "Diplomat's Pack", "Lute", "Leather Armor", "Dagger"],
+    "features": ["Spellcasting", "Bardic Inspiration"],
+    "cantrips": ["Vicious Mockery", "Light"],
+    "spells": ["Charm Person", "Healing Word", "Thunderwave", "Detect Magic"],
+    "spell_slots": {"1": 2}
+  },
+  "cleric": {
+    "equipment": ["Mace", "Scale Mail", "Shield", "Light Crossbow", "20 Bolts", "Priest's Pack", "Holy Symbol"],
+    "features": ["Spellcasting", "Divine Domain"],
+    "cantrips": ["Sacred Flame", "Guidance", "Light"],
+    "spells": ["Bless", "Cure Wounds", "Healing Word", "Shield of Faith"],
+    "spell_slots": {"1": 2}
+  },
+  "druid": {
+    "equipment": ["Wooden Shield", "Scimitar", "Leather Armor", "Explorer's Pack", "Druidic Focus"],
+    "features": ["Druidic", "Spellcasting"],
+    "cantrips": ["Druidcraft", "Produce Flame"],
+    "spells": ["Entangle", "Cure Wounds", "Thunderwave", "Faerie Fire"],
+    "spell_slots": {"1": 2}
+  },
+  "fighter": {
+    "equipment": ["Chain Mail", "Shield", "Longsword", "Handaxe", "Handaxe", "Explorer's Pack"],
+    "features": ["Fighting Style", "Second Wind"],
+    "cantrips": [],
+    "spells": [],
+    "spell_slots": {}
+  },
+  "monk": {
+    "equipment": ["Shortsword", "Dungeoneer's Pack", "Dart", "Dart", "Dart", "Dart", "Dart", "Dart", "Dart", "Dart", "Dart", "Dart"],
+    "features": ["Unarmored Defense", "Martial Arts"],
+    "cantrips": [],
+    "spells": [],
+    "spell_slots": {}
+  },
+  "paladin": {
+    "equipment": ["Chain Mail", "Shield", "Longsword", "Javelin", "Javelin", "Javelin", "Javelin", "Javelin", "Priest's Pack", "Holy Symbol"],
+    "features": ["Divine Sense", "Lay on Hands"],
+    "cantrips": [],
+    "spells": [],
+    "spell_slots": {}
+  },
+  "ranger": {
+    "equipment": ["Scale Mail", "Shortsword", "Shortsword", "Longbow", "20 Arrows", "Explorer's Pack"],
+    "features": ["Favored Enemy", "Natural Explorer"],
+    "cantrips": [],
+    "spells": [],
+    "spell_slots": {}
+  },
+  "rogue": {
+    "equipment": ["Rapier", "Shortbow", "20 Arrows", "Burglar's Pack", "Leather Armor", "Dagger", "Dagger", "Thieves' Tools"],
+    "features": ["Expertise", "Sneak Attack", "Thieves' Cant"],
+    "cantrips": [],
+    "spells": [],
+    "spell_slots": {}
+  },
+  "sorcerer": {
+    "equipment": ["Light Crossbow", "20 Bolts", "Component Pouch", "Dungeoneer's Pack", "Dagger", "Dagger"],
+    "features": ["Spellcasting", "Sorcerous Origin"],
+    "cantrips": ["Fire Bolt", "Ray of Frost", "Minor Illusion", "Prestidigitation"],
+    "spells": ["Magic Missile", "Shield"],
+    "spell_slots": {"1": 2}
+  },
+  "warlock": {
+    "equipment": ["Light Crossbow", "20 Bolts", "Component Pouch", "Scholar's Pack", "Leather Armor", "Dagger", "Dagger"],
+    "features": ["Otherworldly Patron", "Pact Magic"],
+    "cantrips": ["Eldritch Blast", "Minor Illusion"],
+    "spells": ["Hex", "Charm Person"],
+    "spell_slots": {"1": 1}
+  },
+  "wizard": {
+    "equipment": ["Quarterstaff", "Component Pouch", "Scholar's Pack", "Spellbook"],
+    "features": ["Spellcasting", "Arcane Recovery"],
+    "cantrips": ["Fire Bolt", "Mage Hand", "Light"],
+    "spells": ["Magic Missile", "Shield", "Mage Armor", "Detect Magic", "Sleep", "Thunderwave"],
+    "spell_slots": {"1": 2}
+  }
+}

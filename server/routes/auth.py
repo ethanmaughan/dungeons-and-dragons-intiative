@@ -120,21 +120,22 @@ def delete_item(
         if not campaign:
             return JSONResponse({"error": "Campaign not found."}, status_code=404)
 
-        # Verify the player owns a character in this campaign
-        owns = db.query(Character).filter(
-            Character.campaign_id == campaign.id,
-            Character.player_id == player.id,
-        ).first()
-        if not owns:
+        # Verify the player owns this campaign
+        if campaign.owner_id != player.id:
             return JSONResponse({"error": "You don't own this campaign."}, status_code=403)
 
-        # Delete all related data: logs, game_state, sessions, characters, then campaign
+        # Delete sessions, logs, game_state. Unassign characters (don't delete them).
         sessions = db.query(GameSession).filter(GameSession.campaign_id == campaign.id).all()
         for session in sessions:
             db.query(GameLog).filter(GameLog.session_id == session.id).delete()
             db.query(GameState).filter(GameState.session_id == session.id).delete()
             db.delete(session)
-        db.query(Character).filter(Character.campaign_id == campaign.id).delete()
+        # Unassign player characters, delete enemy/NPC characters
+        for char in db.query(Character).filter(Character.campaign_id == campaign.id).all():
+            if char.is_enemy or char.is_npc:
+                db.delete(char)
+            else:
+                char.campaign_id = None
         db.delete(campaign)
         db.commit()
         return JSONResponse({"success": True})

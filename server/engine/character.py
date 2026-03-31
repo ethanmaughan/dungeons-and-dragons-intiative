@@ -1,10 +1,7 @@
-"""Character creation helpers: extraction, stat calculation, and finalization."""
+"""Character creation helpers: stat calculation, starting data, and finalization."""
 
 import json
-import traceback
-
-import ollama
-
+from pathlib import Path
 
 # Standard array for ability scores
 STANDARD_ARRAY = [15, 14, 13, 12, 10, 8]
@@ -59,41 +56,23 @@ RACIAL_BONUSES = {
     "half-elf": {"cha": 2},
 }
 
+# Class starting data cache
+CLASS_DATA_FILE = Path(__file__).parent.parent.parent / "data" / "srd" / "class_starting_data.json"
+_class_data_cache = None
 
-async def extract_character_choices(conversation_text: str) -> dict:
-    """Use Ollama to extract structured character choices from conversation."""
-    try:
-        response = ollama.chat(
-            model="mistral",
-            messages=[{
-                "role": "user",
-                "content": (
-                    "Extract the D&D character choices from this conversation between a DM and a player. "
-                    "Return ONLY valid JSON, nothing else. Use null for any field not yet decided.\n\n"
-                    "Fields: race, class, name, strength_focus (what abilities they emphasized)\n\n"
-                    'Example: {"race": "Elf", "class": "Ranger", "name": "Aria", "strength_focus": "dexterity and wisdom"}\n\n'
-                    f"Conversation:\n{conversation_text}"
-                ),
-            }],
-        )
 
-        text = response.message.content.strip()
-        # Find JSON in the response (it might have extra text)
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start >= 0 and end > start:
-            return json.loads(text[start:end])
-        return {}
-    except Exception:
-        traceback.print_exc()
-        return {}
+def get_class_starting_data(char_class: str) -> dict:
+    """Load starting equipment, spells, and features for a class."""
+    global _class_data_cache
+    if _class_data_cache is None:
+        _class_data_cache = json.loads(CLASS_DATA_FILE.read_text())
+    return _class_data_cache.get(char_class.lower(), {})
 
 
 def assign_ability_scores(char_class: str) -> dict:
     """Assign standard array scores based on class priorities."""
     class_key = char_class.lower()
     priority = CLASS_PRIMARY_ABILITIES.get(class_key, ["str", "dex", "con", "int", "wis", "cha"])
-
     scores = {}
     for i, ability in enumerate(priority):
         scores[ability] = STANDARD_ARRAY[i]
@@ -122,25 +101,25 @@ def get_starting_ac(char_class: str) -> int:
     return CLASS_BASE_AC.get(char_class.lower(), 10)
 
 
-def finalize_character(character, choices: dict, game_state) -> None:
-    """Apply all extracted choices to the character and mark creation complete."""
-    if choices.get("race"):
-        character.race = choices["race"]
-    if choices.get("class"):
-        character.char_class = choices["class"]
-    if choices.get("name"):
-        character.character_name = choices["name"]
+def finalize_character(character, choices: dict = None, game_state=None) -> None:
+    """Apply stats, equipment, spells, and features to a character. Mark creation complete."""
+    if choices:
+        if choices.get("race"):
+            character.race = choices["race"]
+        if choices.get("class"):
+            character.char_class = choices["class"]
+        if choices.get("name"):
+            character.character_name = choices["name"]
 
-    # Assign ability scores if we have a class
-    if character.char_class and character.char_class != "Fighter":
-        scores = assign_ability_scores(character.char_class)
-        scores = apply_racial_bonuses(scores, character.race)
-        character.str_score = scores.get("str", 10)
-        character.dex_score = scores.get("dex", 10)
-        character.con_score = scores.get("con", 10)
-        character.int_score = scores.get("int", 10)
-        character.wis_score = scores.get("wis", 10)
-        character.cha_score = scores.get("cha", 10)
+    # Assign ability scores
+    scores = assign_ability_scores(character.char_class)
+    scores = apply_racial_bonuses(scores, character.race)
+    character.str_score = scores.get("str", 10)
+    character.dex_score = scores.get("dex", 10)
+    character.con_score = scores.get("con", 10)
+    character.int_score = scores.get("int", 10)
+    character.wis_score = scores.get("wis", 10)
+    character.cha_score = scores.get("cha", 10)
 
     # Calculate derived stats
     character.hp_max = calculate_starting_hp(character.char_class, character.con_score)
@@ -150,19 +129,23 @@ def finalize_character(character, choices: dict, game_state) -> None:
     character.proficiency_bonus = 2
     character.speed = 30
 
+    # Populate starting equipment, spells, and features from class data
+    class_data = get_class_starting_data(character.char_class)
+    character.inventory = class_data.get("equipment", [])
+    character.features = class_data.get("features", [])
+
+    cantrips = class_data.get("cantrips", [])
+    spells = class_data.get("spells", [])
+    character.spells = cantrips + spells
+
+    slots = class_data.get("spell_slots", {})
+    character.spell_slots = slots
+    character.spell_slots_current = dict(slots)
+
     # Mark complete
     character.creation_complete = True
-    game_state.game_mode = "exploration"
-    game_state.creation_step = None
-    game_state.environment_description = "Your adventure begins..."
 
-
-def determine_creation_step(choices: dict) -> str:
-    """Determine which step of character creation we're on based on choices made."""
-    if not choices.get("race"):
-        return "race"
-    if not choices.get("class"):
-        return "class"
-    if not choices.get("name"):
-        return "name"
-    return "confirm"
+    if game_state:
+        game_state.game_mode = "exploration"
+        game_state.creation_step = None
+        game_state.environment_description = "Your adventure begins..."

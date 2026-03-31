@@ -93,8 +93,8 @@ All art, maps, and campaign stories are human-created. The AI executes them live
 
 ### Next
 - [ ] Deploy to web (hosting + domain: foraygames.com)
-- [ ] Rebrand UI from "D&D Initiative" to "Foray"
-- [ ] Remove official D&D campaign references
+- [x] Rebrand UI to "Foray"
+- [x] Remove official campaign references
 - [ ] Multiplayer (WebSockets, shared sessions)
 - [ ] Subscription/payment system
 - [ ] Visual battle map with token movement

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ character.character_name }} — D&D Initiative{% endblock %}
+{% block title %}{{ character.character_name }} — Foray{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-8">
@@ -124,8 +124,35 @@
             </ul>
             {% endif %}
 
+            {% if character.spell_slots %}
+            <h2 class="gold-text font-bold mt-6 mb-3">Spell Slots</h2>
+            <div class="space-y-1 text-sm">
+                {% for level, max_slots in character.spell_slots.items() %}
+                {% set current = character.spell_slots_current.get(level, 0) if character.spell_slots_current else 0 %}
+                <div class="flex justify-between text-gray-300">
+                    <span>Level {{ level }}</span>
+                    <span class="{% if current == 0 %}text-red-400{% else %}text-blue-400{% endif %}">{{ current }}/{{ max_slots }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
             <h2 class="gold-text font-bold mt-6 mb-3">Campaign</h2>
+            {% if character.campaign %}
             <p class="text-gray-300 text-sm">{{ character.campaign.name }}</p>
+            {% else %}
+            <p class="text-yellow-500 text-sm">Unassigned</p>
+            {% if available_campaigns %}
+            <form action="/api/characters/{{ character.id }}/assign" method="post" class="mt-2">
+                <select name="campaign_id" class="action-input rounded px-2 py-1 text-sm w-full mb-2">
+                    {% for camp in available_campaigns %}
+                    <option value="{{ camp.id }}">{{ camp.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-action rounded px-3 py-1 text-sm w-full">Assign to Campaign</button>
+            </form>
+            {% endif %}
+            {% endif %}
         </div>
     </div>
 

@@ -65,6 +65,10 @@ def process_dm_response(raw_text: str, characters: list, game_state, db) -> dict
                 replacement = _handle_inventory(params, characters, state_changes)
             elif tag_type == "COMBAT":
                 replacement = _handle_combat(params, characters, game_state, state_changes, db)
+            elif tag_type == "SPELL":
+                replacement = _handle_spell(params, characters, state_changes)
+            elif tag_type == "REST":
+                replacement = _handle_rest(params, characters, state_changes)
             else:
                 replacement = f"[{tag_type}:{match.group(2)}]"
         except Exception:
@@ -316,3 +320,65 @@ def _handle_combat(params: list, characters: list, game_state, state_changes: di
         return "\n--- COMBAT ENDS ---\n"
 
     return ""
+
+
+def _handle_spell(params: list, characters: list, state_changes: dict) -> str:
+    """Handle [SPELL:caster:spell_name:slot_level] tags."""
+    if len(params) < 3:
+        return "[invalid spell]"
+
+    caster_name = params[0]
+    spell_name = params[1]
+    slot_level = params[2]
+
+    caster = find_character(characters, caster_name)
+    if not caster:
+        return f"[{caster_name} not found]"
+
+    # Cantrips (level 0) don't consume slots
+    if slot_level == "0" or slot_level == "cantrip":
+        state_changes.setdefault("spells_cast", []).append({
+            "caster": caster.character_name, "spell": spell_name, "level": 0,
+        })
+        return f"({caster.character_name} casts {spell_name})"
+
+    # Check spell slots
+    current_slots = caster.spell_slots_current or {}
+    available = current_slots.get(slot_level, 0)
+
+    if available <= 0:
+        return f"({caster.character_name} has no level {slot_level} spell slots remaining!)"
+
+    # Consume the slot
+    current_slots[slot_level] = available - 1
+    caster.spell_slots_current = dict(current_slots)
+
+    state_changes.setdefault("spells_cast", []).append({
+        "caster": caster.character_name, "spell": spell_name,
+        "level": int(slot_level), "slots_remaining": available - 1,
+    })
+
+    return f"({caster.character_name} casts {spell_name} — Level {slot_level} slot used, {available - 1} remaining)"
+
+
+def _handle_rest(params: list, characters: list, state_changes: dict) -> str:
+    """Handle [REST:long] and [REST:short] tags."""
+    rest_type = params[0].lower() if params else "long"
+
+    pc = next((c for c in characters if not c.is_npc and not c.is_enemy), None)
+    if not pc:
+        return ""
+
+    if rest_type == "long":
+        pc.hp_current = pc.hp_max
+        pc.spell_slots_current = dict(pc.spell_slots or {})
+        pc.conditions = []
+        state_changes["rest"] = {
+            "type": "long",
+            "hp_restored": pc.hp_max,
+            "slots_restored": True,
+        }
+        return f"({pc.character_name} completes a long rest. HP and spell slots fully restored.)"
+    else:
+        state_changes["rest"] = {"type": "short"}
+        return f"({pc.character_name} takes a short rest.)"
