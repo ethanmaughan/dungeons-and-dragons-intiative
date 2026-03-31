@@ -450,6 +450,15 @@ def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state
     if not target:
         return f"[{target_name} not found]"
 
+    # Don't attack dead targets
+    if target.hp_current <= 0:
+        state_changes["player_down"] = True
+        return f"\n{target.character_name} is already down!"
+
+    # Don't attack if attacker is dead
+    if attacker.hp_current <= 0:
+        return ""
+
     # Get attacker's stats
     str_mod = ability_modifier(attacker.str_score)
     dex_mod = ability_modifier(attacker.dex_score)
@@ -486,10 +495,16 @@ def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state
             "target": target.character_name, "old": old_hp, "new": target.hp_current, "change": -total_dmg,
         })
 
+        down_msg = ""
+        if target.hp_current <= 0:
+            state_changes["player_down"] = True
+            down_msg = f"\n\n** {target.character_name} falls unconscious! **"
+
         return (
             f"\n{attacker.character_name} strikes at {target.character_name} — "
             f"**CRITICAL HIT!** (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac}) "
             f"dealing {total_dmg} damage! ({target.character_name}: HP {old_hp} → {target.hp_current})"
+            f"{down_msg}"
         )
 
     elif hit:
@@ -507,10 +522,16 @@ def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state
             "target": target.character_name, "old": old_hp, "new": target.hp_current, "change": -total_dmg,
         })
 
+        down_msg = ""
+        if target.hp_current <= 0:
+            state_changes["player_down"] = True
+            down_msg = f"\n\n** {target.character_name} falls unconscious! **"
+
         return (
             f"\n{attacker.character_name} strikes at {target.character_name} — "
             f"Hit! (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac}) "
             f"dealing {total_dmg} damage. ({target.character_name}: HP {old_hp} → {target.hp_current})"
+            f"{down_msg}"
         )
 
     else:
