@@ -92,7 +92,7 @@ All art, maps, and campaign stories are human-created. The AI executes them live
 - [x] Sidebar with character sheet, party status, navigation
 
 ### Next
-- [ ] Deploy to web (hosting + domain: foraygames.com)
+- [x] Deploy to web (hosting + domain: foraygames.com)
 - [x] Rebrand UI to "Foray"
 - [x] Remove official campaign references
 - [ ] Multiplayer (WebSockets, shared sessions)
@@ -103,6 +103,22 @@ All art, maps, and campaign stories are human-created. The AI executes them live
 - [ ] Adaptive antagonist system
 - [ ] Sound effects and ambient music
 - [ ] Mobile-responsive design
+
+### Future — Multi-Agent Architecture
+The current system uses a single GM agent for everything. The target architecture separates concerns:
+
+- [ ] **GM Agent** — storyteller and world-builder. Introduces enemies, narrates scenes, manages plot. Does NOT control enemy combat actions directly.
+- [ ] **Combat Engine** — when the GM introduces an enemy, the system creates an autonomous entity with stats, behavior profile, and tactical preferences.
+- [ ] **Enemy Agents** — on their initiative turn, basic enemies (goblins, wolves) use rules-based Python logic (no API call). Boss enemies and villains get a dedicated Claude API call with tactical prompts for smart decision-making.
+- [ ] **NPC Agents** — persistent agents with personality, memory, and knowledge tiers. Claude API call with that NPC's data when the player interacts with them.
+- [ ] **Adaptive Antagonist** — the campaign's main villain is a persistent agent that tracks player actions across sessions and adapts strategy.
+
+This architecture means:
+- Enemy turns are instant (no waiting for API) for basic enemies
+- Boss fights feel smarter because they get their own AI
+- NPCs have consistent personalities across sessions
+- The GM focuses on storytelling, not micromanaging combat math
+- Python handles all of this natively (Anthropic SDK, async, etc.)
 
 ### Future — Community Marketplace
 - [ ] **The Foray Workshop** — a marketplace where creators upload and share content
