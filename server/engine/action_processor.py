@@ -11,8 +11,8 @@ from server.engine.dice import (
     saving_throw,
 )
 
-# Matches tags like [ROLL:ability_check:STR:15] or [HP:Hero:-7]
-TAG_PATTERN = re.compile(r"\[([A-Z]+):([^\]]+)\]")
+# Matches tags like [ROLL:ability_check:STR:15] or [ENEMY_ATTACK:Goblin:Hero]
+TAG_PATTERN = re.compile(r"\[([A-Z_]+):([^\]]+)\]")
 
 # Map ability abbreviations to character attribute names
 ABILITY_MAP = {
@@ -71,6 +71,12 @@ def process_dm_response(raw_text: str, characters: list, game_state, db) -> dict
                 replacement = _handle_rest(params, characters, state_changes)
             elif tag_type == "XP":
                 replacement = _handle_xp(params, characters, state_changes)
+            elif tag_type == "ENEMY_ATTACK":
+                replacement = _handle_enemy_attack(params, characters, dice_rolls, state_changes)
+            elif tag_type == "PLAYER_ATTACK":
+                replacement = _handle_player_attack(params, characters, dice_rolls, state_changes)
+            elif tag_type == "ENEMY_TURN":
+                replacement = _handle_enemy_turn(params, characters, dice_rolls, state_changes)
             else:
                 replacement = f"[{tag_type}:{match.group(2)}]"
         except Exception:
@@ -425,3 +431,200 @@ def _handle_xp(params: list, characters: list, state_changes: dict) -> str:
         state_changes["level_up"] = level_info
 
     return result_text
+
+
+def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state_changes: dict) -> str:
+    """Handle [ENEMY_ATTACK:attacker_name:target_name].
+    Server handles EVERYTHING: lookup stats, roll attack, compare AC, roll damage, apply HP."""
+    if len(params) < 2:
+        return "[invalid enemy attack]"
+
+    attacker_name = params[0]
+    target_name = params[1]
+
+    attacker = find_character(characters, attacker_name)
+    target = find_character(characters, target_name)
+
+    if not attacker:
+        return f"[{attacker_name} not found]"
+    if not target:
+        return f"[{target_name} not found]"
+
+    # Get attacker's stats
+    str_mod = ability_modifier(attacker.str_score)
+    dex_mod = ability_modifier(attacker.dex_score)
+    attack_mod = max(str_mod, dex_mod) + attacker.proficiency_bonus
+
+    # Roll attack
+    atk = attack_roll(attack_mod)
+    hit = atk["critical"] or (not atk["fumble"] and atk["total"] >= target.ac)
+
+    dice_rolls.append({
+        "type": "enemy_attack",
+        "attacker": attacker.character_name,
+        "target": target.character_name,
+        "roll": atk["rolls"][0],
+        "modifier": atk["modifier"],
+        "total": atk["total"],
+        "target_ac": target.ac,
+        "hit": hit,
+        "critical": atk["critical"],
+    })
+
+    if atk["critical"]:
+        # Critical hit — double damage dice
+        dmg_die = max(4, 6)  # Default d6 if unknown
+        dmg = roll(f"2d{dmg_die}")
+        dmg_mod = max(str_mod, dex_mod)
+        total_dmg = dmg["total"] + dmg_mod
+
+        old_hp = target.hp_current
+        target.hp_current = max(0, target.hp_current - total_dmg)
+
+        dice_rolls.append({"type": "damage", "total": total_dmg, "critical": True})
+        state_changes.setdefault("hp_changes", []).append({
+            "target": target.character_name, "old": old_hp, "new": target.hp_current, "change": -total_dmg,
+        })
+
+        return (
+            f"\n{attacker.character_name} strikes at {target.character_name} — "
+            f"**CRITICAL HIT!** (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac}) "
+            f"dealing {total_dmg} damage! ({target.character_name}: HP {old_hp} → {target.hp_current})"
+        )
+
+    elif hit:
+        # Normal hit
+        dmg_die = max(4, 6)
+        dmg = roll(f"1d{dmg_die}")
+        dmg_mod = max(str_mod, dex_mod)
+        total_dmg = dmg["total"] + dmg_mod
+
+        old_hp = target.hp_current
+        target.hp_current = max(0, target.hp_current - total_dmg)
+
+        dice_rolls.append({"type": "damage", "total": total_dmg})
+        state_changes.setdefault("hp_changes", []).append({
+            "target": target.character_name, "old": old_hp, "new": target.hp_current, "change": -total_dmg,
+        })
+
+        return (
+            f"\n{attacker.character_name} strikes at {target.character_name} — "
+            f"Hit! (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac}) "
+            f"dealing {total_dmg} damage. ({target.character_name}: HP {old_hp} → {target.hp_current})"
+        )
+
+    else:
+        # Miss
+        return (
+            f"\n{attacker.character_name} strikes at {target.character_name} — "
+            f"Miss! (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac})"
+        )
+
+
+def _handle_player_attack(params: list, characters: list, dice_rolls: list, state_changes: dict) -> str:
+    """Handle [PLAYER_ATTACK:player_name:target_name].
+    Server handles everything for the player's basic attack."""
+    if len(params) < 2:
+        return "[invalid player attack]"
+
+    attacker_name = params[0]
+    target_name = params[1]
+
+    attacker = find_character(characters, attacker_name)
+    target = find_character(characters, target_name)
+
+    if not attacker:
+        return f"[{attacker_name} not found]"
+    if not target:
+        return f"[{target_name} not found]"
+
+    # Get attacker's stats
+    str_mod = ability_modifier(attacker.str_score)
+    dex_mod = ability_modifier(attacker.dex_score)
+    attack_mod = max(str_mod, dex_mod) + attacker.proficiency_bonus
+
+    # Roll attack
+    atk = attack_roll(attack_mod)
+    hit = atk["critical"] or (not atk["fumble"] and atk["total"] >= target.ac)
+
+    dice_rolls.append({
+        "type": "player_attack",
+        "attacker": attacker.character_name,
+        "target": target.character_name,
+        "roll": atk["rolls"][0],
+        "modifier": atk["modifier"],
+        "total": atk["total"],
+        "target_ac": target.ac,
+        "hit": hit,
+        "critical": atk["critical"],
+    })
+
+    if atk["critical"]:
+        dmg = roll("2d8")
+        dmg_mod = max(str_mod, dex_mod)
+        total_dmg = dmg["total"] + dmg_mod
+
+        old_hp = target.hp_current
+        target.hp_current = max(0, target.hp_current - total_dmg)
+
+        dice_rolls.append({"type": "damage", "total": total_dmg, "critical": True})
+        state_changes.setdefault("hp_changes", []).append({
+            "target": target.character_name, "old": old_hp, "new": target.hp_current, "change": -total_dmg,
+        })
+
+        defeated = " The creature crumples to the ground!" if target.hp_current <= 0 else ""
+        return (
+            f"\nYou strike at {target.character_name} — "
+            f"**CRITICAL HIT!** (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac}) "
+            f"dealing {total_dmg} damage! ({target.character_name}: HP {old_hp} → {target.hp_current}){defeated}"
+        )
+
+    elif hit:
+        dmg = roll("1d8")
+        dmg_mod = max(str_mod, dex_mod)
+        total_dmg = dmg["total"] + dmg_mod
+
+        old_hp = target.hp_current
+        target.hp_current = max(0, target.hp_current - total_dmg)
+
+        dice_rolls.append({"type": "damage", "total": total_dmg})
+        state_changes.setdefault("hp_changes", []).append({
+            "target": target.character_name, "old": old_hp, "new": target.hp_current, "change": -total_dmg,
+        })
+
+        defeated = " The creature crumples to the ground!" if target.hp_current <= 0 else ""
+        return (
+            f"\nYou strike at {target.character_name} — "
+            f"Hit! (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac}) "
+            f"dealing {total_dmg} damage. ({target.character_name}: HP {old_hp} → {target.hp_current}){defeated}"
+        )
+
+    else:
+        miss_text = "Critical fumble!" if atk["fumble"] else "Miss!"
+        return (
+            f"\nYou strike at {target.character_name} — "
+            f"{miss_text} (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac})"
+        )
+
+
+def _handle_enemy_turn(params: list, characters: list, dice_rolls: list, state_changes: dict) -> str:
+    """Handle [ENEMY_TURN:enemy_name]. The server decides and executes the enemy's action.
+    For basic enemies, this picks the nearest/most logical target and attacks."""
+    if not params:
+        return ""
+
+    enemy_name = params[0]
+    enemy = find_character(characters, enemy_name)
+    if not enemy or enemy.hp_current <= 0:
+        return ""
+
+    # Find the best target (player characters only, alive)
+    targets = [c for c in characters if not c.is_npc and not c.is_enemy and c.hp_current > 0]
+    if not targets:
+        return ""
+
+    # Simple AI: attack the player with lowest HP
+    target = min(targets, key=lambda c: c.hp_current)
+
+    # Execute the attack using the same logic as ENEMY_ATTACK
+    return _handle_enemy_attack([enemy_name, target.character_name], characters, dice_rolls, state_changes)
