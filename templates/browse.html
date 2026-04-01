@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Browse Games — Foray{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-8">
+        <h1 class="text-3xl gold-text font-bold">Browse Games</h1>
+        <a href="/dashboard" class="btn-secondary rounded px-4 py-2 text-sm">Back to Dashboard</a>
+    </div>
+
+    {% if not unassigned_chars %}
+    <div class="parchment rounded-lg p-6 mb-6 text-center">
+        <p class="text-gray-400 mb-3">You need an unassigned character to join a campaign.</p>
+        <a href="/character/create" class="btn-action rounded px-6 py-2 font-bold inline-block">Create Character</a>
+    </div>
+    {% endif %}
+
+    {% if browse_campaigns %}
+    <div class="space-y-4">
+        {% for item in browse_campaigns %}
+        {% set c = item.campaign %}
+        <div class="parchment rounded-lg p-5">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                        <h2 class="gold-text font-bold text-lg">{{ c.name }}</h2>
+                        {% if c.visibility == "private" %}
+                        <span class="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">Private</span>
+                        {% else %}
+                        <span class="text-xs bg-green-900/50 text-green-400 px-2 py-0.5 rounded">Open</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-gray-400 text-sm mb-2">{{ c.setting[:200] }}{% if c.setting|length > 200 %}...{% endif %}</p>
+                    <div class="text-xs text-gray-500">
+                        <span>Owner: {{ c.owner.display_name or c.owner.username }}</span>
+                        <span class="mx-2">&middot;</span>
+                        <span>Players: {{ item.player_count }}/{{ c.max_players }}</span>
+                    </div>
+                </div>
+
+                <div class="ml-4 flex-shrink-0">
+                    {% if item.has_pending_request %}
+                        <span class="text-yellow-500 text-sm">Request Pending</span>
+                    {% elif item.player_count >= c.max_players %}
+                        <span class="text-gray-500 text-sm">Full</span>
+                    {% elif unassigned_chars %}
+                        <form action="/api/campaigns/{{ c.id }}/join" method="post" class="flex items-center gap-2">
+                            <select name="character_id" class="action-input rounded px-2 py-1.5 text-sm">
+                                {% for ch in unassigned_chars %}
+                                <option value="{{ ch.id }}">{{ ch.character_name }} ({{ ch.race }} {{ ch.char_class }})</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn-action rounded px-4 py-1.5 text-sm font-bold">
+                                {% if c.visibility == "private" %}Request{% else %}Join{% endif %}
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12">
+        <p class="text-gray-500 text-lg italic">No campaigns available to join right now.</p>
+        <p class="text-gray-600 text-sm mt-2">Check back later or create your own!</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

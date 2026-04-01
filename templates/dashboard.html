@@ -17,6 +17,9 @@
                 class="btn-secondary rounded px-6 py-3 font-bold">
             + Create Campaign
         </button>
+        <a href="/browse" class="btn-secondary rounded px-6 py-3 font-bold">
+            Browse Games
+        </a>
     </div>
 
     <!-- Inline Campaign Creation Form (hidden by default) -->
@@ -35,9 +38,56 @@
                           class="action-input w-full rounded px-3 py-2"
                           placeholder="Describe the world">A classic fantasy world of swords, sorcery, and ancient ruins.</textarea>
             </div>
+            <div class="flex gap-6">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Visibility</label>
+                    <select name="visibility" class="action-input rounded px-3 py-2">
+                        <option value="open">Open (anyone can join)</option>
+                        <option value="private">Private (requires approval)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Max Players</label>
+                    <select name="max_players" class="action-input rounded px-3 py-2">
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4" selected>4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                    </select>
+                </div>
+            </div>
             <button type="submit" class="btn-action rounded px-6 py-2 font-bold">Create Campaign</button>
         </form>
     </div>
+
+    <!-- Pending Join Requests -->
+    {% if pending_requests %}
+    <div class="parchment rounded-lg p-6 mb-10">
+        <h2 class="text-xl gold-text mb-4">Join Requests</h2>
+        <div class="space-y-3">
+            {% for jr in pending_requests %}
+            <div class="flex items-center justify-between bg-gray-800/50 rounded px-4 py-3">
+                <div>
+                    <span class="text-gray-300 font-bold">{{ jr.player.display_name or jr.player.username }}</span>
+                    <span class="text-gray-500 mx-1">wants to join</span>
+                    <span class="gold-text font-bold">{{ jr.campaign.name }}</span>
+                    <span class="text-gray-500 mx-1">as</span>
+                    <span class="text-blue-400">{{ jr.character.character_name }} ({{ jr.character.race }} {{ jr.character.char_class }})</span>
+                </div>
+                <div class="flex gap-2">
+                    <form action="/api/campaigns/{{ jr.campaign_id }}/approve/{{ jr.id }}" method="post" class="inline">
+                        <button type="submit" class="bg-green-800 hover:bg-green-700 text-white rounded px-3 py-1 text-sm">Approve</button>
+                    </form>
+                    <form action="/api/campaigns/{{ jr.campaign_id }}/reject/{{ jr.id }}" method="post" class="inline">
+                        <button type="submit" class="bg-red-900 hover:bg-red-800 text-white rounded px-3 py-1 text-sm">Reject</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Your Characters -->
     <div class="mb-10">
@@ -103,31 +153,50 @@
         {% if campaigns %}
         <div class="space-y-2">
             {% for campaign in campaigns %}
-            <div class="parchment rounded-lg p-4 flex items-center justify-between">
-                <div>
-                    <span class="gold-text font-bold">{{ campaign.name }}</span>
-                    {% set assigned = [] %}
-                    {% for c in characters if c.campaign_id == campaign.id %}
-                        {% if assigned.append(c) %}{% endif %}
-                    {% endfor %}
-                    {% if assigned %}
-                    <span class="text-gray-500 text-sm ml-2">
-                        — {{ assigned | map(attribute='character_name') | join(', ') }}
-                    </span>
-                    {% else %}
-                    <span class="text-yellow-500 text-sm ml-2">— No character assigned</span>
-                    {% endif %}
-                </div>
-                <div class="flex items-center gap-3">
-                    <button onclick="showDeleteModal('campaign', {{ campaign.id }}, '{{ campaign.name }}')"
-                            class="text-red-800 hover:text-red-400 text-xs transition-colors">
-                        Delete
-                    </button>
-                    {% for s in active_sessions if s.campaign_id == campaign.id %}
-                    <a href="/play/{{ s.id }}" class="btn-action rounded px-4 py-2 text-sm font-bold">
-                        Play
-                    </a>
-                    {% endfor %}
+            <div class="parchment rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="gold-text font-bold">{{ campaign.name }}</span>
+                            {% if campaign.visibility == "private" %}
+                            <span class="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">Private</span>
+                            {% else %}
+                            <span class="text-xs bg-green-900/50 text-green-400 px-1.5 py-0.5 rounded">Open</span>
+                            {% endif %}
+                        </div>
+                        {% set assigned = [] %}
+                        {% for c in characters if c.campaign_id == campaign.id %}
+                            {% if assigned.append(c) %}{% endif %}
+                        {% endfor %}
+                        {% if assigned %}
+                        <span class="text-gray-500 text-sm">
+                            {{ assigned | map(attribute='character_name') | join(', ') }}
+                        </span>
+                        {% else %}
+                        <span class="text-yellow-500 text-sm">No character assigned</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <!-- Visibility toggle (owner only) -->
+                        {% if campaign.owner_id == player.id %}
+                        <form action="/api/campaigns/{{ campaign.id }}/visibility" method="post" class="inline">
+                            <input type="hidden" name="visibility" value="{% if campaign.visibility == 'open' %}private{% else %}open{% endif %}">
+                            <button type="submit" class="text-xs text-gray-400 hover:text-gray-200 transition-colors"
+                                    title="Toggle visibility">
+                                {% if campaign.visibility == "open" %}Make Private{% else %}Make Open{% endif %}
+                            </button>
+                        </form>
+                        {% endif %}
+                        <button onclick="showDeleteModal('campaign', {{ campaign.id }}, '{{ campaign.name }}')"
+                                class="text-red-800 hover:text-red-400 text-xs transition-colors">
+                            Delete
+                        </button>
+                        {% for s in active_sessions if s.campaign_id == campaign.id %}
+                        <a href="/play/{{ s.id }}" class="btn-action rounded px-4 py-2 text-sm font-bold">
+                            Play
+                        </a>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
             {% endfor %}

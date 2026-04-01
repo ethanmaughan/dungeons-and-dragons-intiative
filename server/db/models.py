@@ -32,6 +32,8 @@ class Campaign(Base):
     active_threads: Mapped[dict | None] = mapped_column(JSON, default=list)
     world_day: Mapped[int] = mapped_column(Integer, default=1)
     world_hour: Mapped[int] = mapped_column(Integer, default=8)
+    visibility: Mapped[str] = mapped_column(String(20), default="open")
+    max_players: Mapped[int] = mapped_column(Integer, default=4)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
@@ -39,6 +41,7 @@ class Campaign(Base):
     owner: Mapped["Player | None"] = relationship(back_populates="campaigns")
     sessions: Mapped[list["Session"]] = relationship(back_populates="campaign")
     characters: Mapped[list["Character"]] = relationship(back_populates="campaign")
+    join_requests: Mapped[list["JoinRequest"]] = relationship(back_populates="campaign")
 
 
 class Session(Base):
@@ -129,6 +132,7 @@ class GameLog(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+    character_id: Mapped[int | None] = mapped_column(ForeignKey("characters.id"), nullable=True)
     turn_number: Mapped[int] = mapped_column(Integer, default=0)
     actor: Mapped[str] = mapped_column(String(100), default="system")
     action_text: Mapped[str | None] = mapped_column(Text, default="")
@@ -141,3 +145,21 @@ class GameLog(Base):
     )
 
     session: Mapped["Session"] = relationship(back_populates="game_logs")
+    character: Mapped["Character | None"] = relationship()
+
+
+class JoinRequest(Base):
+    __tablename__ = "join_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), nullable=False)
+    player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), nullable=False)
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    campaign: Mapped["Campaign"] = relationship(back_populates="join_requests")
+    player: Mapped["Player"] = relationship()
+    character: Mapped["Character"] = relationship()
