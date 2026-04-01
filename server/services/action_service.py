@@ -160,6 +160,14 @@ async def process_action(
     dice_rolls = []
     state_changes = {}
     if not is_character_creation:
+        # Strip enemy action tags from DM response if in combat — the orchestrator
+        # handles enemy turns now. This prevents enemies from acting twice (once from
+        # DM tags, once from the orchestrator).
+        if game_state and game_state.game_mode == "combat":
+            import re
+            narration = re.sub(r"\[ENEMY_TURN:[^\]]+\]", "", narration)
+            narration = re.sub(r"\[ENEMY_ATTACK:[^\]]+\]", "", narration)
+
         result = process_dm_response(narration, characters, game_state, db)
         narration = result["narration"]
         dice_rolls = result["dice_rolls"]

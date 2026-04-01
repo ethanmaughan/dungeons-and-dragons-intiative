@@ -26,6 +26,10 @@ from server.engine.action_processor import find_character
 async def resolve_enemy_phase(game_state, characters: list, db) -> list[dict]:
     """Resolve all enemy turns until it's a PC's turn.
 
+    Handles two scenarios:
+    1. Normal: player just acted → advance past them → resolve enemies → stop at next PC
+    2. Combat start: if first in initiative is an enemy, resolve them before any PC acts
+
     Returns: list of {
         "narration": str,
         "dice_rolls": list,
@@ -39,6 +43,21 @@ async def resolve_enemy_phase(game_state, characters: list, db) -> list[dict]:
     # Safety limit to prevent infinite loops
     max_turns = len(game_state.initiative_order or []) * 2
     turns_resolved = 0
+
+    # First: check if the CURRENT turn is an enemy (happens when combat just started
+    # and an enemy won initiative). Resolve it before advancing.
+    if is_enemy_turn(game_state):
+        current_id = game_state.current_turn_character_id
+        enemy = None
+        for c in characters:
+            if c.id == current_id:
+                enemy = c
+                break
+        if enemy and enemy.hp_current > 0:
+            decision = await get_enemy_decision(enemy, characters)
+            result = _execute_enemy_action(enemy, decision, characters)
+            results.append(result)
+            turns_resolved += 1
 
     while turns_resolved < max_turns:
         # Advance to next turn
