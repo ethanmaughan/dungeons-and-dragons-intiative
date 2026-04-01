@@ -90,19 +90,13 @@ def browse_campaigns(request: Request, db: DBSession = Depends(get_db)):
     if not player:
         return RedirectResponse(url="/login", status_code=303)
 
-    # Get open campaigns that the player doesn't own
+    # Only show open campaigns on browse — private campaigns are invite-code only
     campaigns = (
         db.query(Campaign)
         .filter(Campaign.visibility == "open", Campaign.owner_id != player.id)
         .all()
     )
-
-    # Also include private campaigns (they can request to join)
-    private_campaigns = (
-        db.query(Campaign)
-        .filter(Campaign.visibility == "private", Campaign.owner_id != player.id)
-        .all()
-    )
+    private_campaigns = []  # Private campaigns don't appear on browse
 
     # Get player's unassigned characters for the join dropdown
     unassigned_chars = (

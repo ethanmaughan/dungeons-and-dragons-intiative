@@ -90,6 +90,27 @@ async def process_action(
 
     is_character_creation = game_state and game_state.game_mode == "character_creation"
 
+    # --- Turn locking: in combat, only the player whose character's turn it is can act ---
+    if (
+        game_state
+        and game_state.game_mode == "combat"
+        and not is_character_creation
+        and acting_character
+        and game_state.current_turn_character_id
+    ):
+        current_turn_id = game_state.current_turn_character_id
+        # Check if it's this player's character's turn
+        if current_turn_id != acting_character.id:
+            # Check if current turn belongs to ANY PC (flexible: any player can act on a PC turn)
+            # but reject if it's an enemy's turn
+            current_entry = None
+            for entry in (game_state.initiative_order or []):
+                if entry["character_id"] == current_turn_id:
+                    current_entry = entry
+                    break
+            if current_entry and current_entry.get("is_enemy", False):
+                return {"error": "It's not your turn — enemies are acting"}
+
     # Handle character creation step logic
     if is_character_creation:
         current_step = game_state.creation_step or "greeting"
