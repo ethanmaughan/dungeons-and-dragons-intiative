@@ -354,7 +354,7 @@
     let actionPending = false;
     let currentGameMode = '{{ game_state.game_mode if game_state else "exploration" }}';
     let currentTurnCharId = {{ game_state.current_turn_character_id if game_state and game_state.current_turn_character_id else 'null' }};
-    let isMyTurn = true;  // Default to true for exploration
+    let currentInitOrder = {{ game_state.initiative_order | tojson if game_state and game_state.initiative_order else '[]' }};
     const SESSION_ID = {{ session.id }};
     const MY_CHARACTER_ID = {{ my_character.id if my_character else 'null' }};
 
@@ -669,13 +669,6 @@
         const text = input.value.trim();
         if (!text || !ws || ws.readyState !== WebSocket.OPEN || actionPending) return;
 
-        // Slash commands always go through, even when not your turn
-        const isSlashCmd = text.startsWith('/');
-        // Turn lock: warn (but don't block) when not your turn
-        if (currentGameMode === 'combat' && !isMyTurn && !isSlashCmd) {
-            // Allow sending — server lets DM answer questions without consuming the turn
-        }
-
         actionPending = true;
         updateSendButton();
 
@@ -700,45 +693,22 @@
             btn.disabled = false;
             btn.textContent = 'Send';
             input.disabled = false;
-            if (currentGameMode === 'combat' && !isMyTurn) {
-                // Find whose turn it is
-                const gs = {initiative_order: window._lastInitOrder, current_turn_character_id: currentTurnCharId};
-                const entry = (gs.initiative_order || []).find(e => e.character_id === gs.current_turn_character_id);
-                const turnName = entry ? entry.character_name : 'someone else';
-                input.placeholder = `${turnName}'s turn — you can still ask questions or use /rewind`;
-            } else if (currentGameMode === 'combat') {
-                input.placeholder = "It's your turn! Describe your action...";
+            if (currentGameMode === 'combat') {
+                // Show whose turn it is as a hint, but don't lock
+                const currentEntry = (currentInitOrder || []).find(
+                    e => e.character_id === currentTurnCharId
+                );
+                if (currentEntry && !currentEntry.is_enemy && currentEntry.character_id === MY_CHARACTER_ID) {
+                    input.placeholder = "It's your turn! Describe your action...";
+                } else if (currentEntry && !currentEntry.is_enemy) {
+                    input.placeholder = "Another player's turn — or type to act...";
+                } else {
+                    input.placeholder = "What do you do?";
+                }
             } else {
                 input.placeholder = "What do you do?";
             }
         }
-    }
-
-    function checkIfMyTurn(gs) {
-        if (!gs || gs.game_mode !== 'combat') {
-            isMyTurn = true;
-            return;
-        }
-        if (!MY_CHARACTER_ID) {
-            isMyTurn = true;  // Campaign owner without character can always act
-            return;
-        }
-        // It's my turn if the current turn character is my character
-        // OR if the current turn is any PC (flexible: any player can act on a PC turn)
-        const currentEntry = (gs.initiative_order || []).find(
-            e => e.character_id === gs.current_turn_character_id
-        );
-        if (!currentEntry) {
-            isMyTurn = true;
-            return;
-        }
-        // If it's an enemy's turn, no one can act
-        if (currentEntry.is_enemy) {
-            isMyTurn = false;
-            return;
-        }
-        // It's a PC's turn — only that PC's player can act
-        isMyTurn = (gs.current_turn_character_id === MY_CHARACTER_ID);
     }
 
     // --- UI Updates ---
@@ -832,8 +802,7 @@
         // Update turn state
         currentGameMode = gs.game_mode;
         currentTurnCharId = gs.current_turn_character_id;
-        window._lastInitOrder = gs.initiative_order || [];
-        checkIfMyTurn(gs);
+        currentInitOrder = gs.initiative_order || [];
         updateSendButton();
 
         // Update mode labels
