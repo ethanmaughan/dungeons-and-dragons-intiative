@@ -135,11 +135,12 @@ def _execute_enemy_action(enemy, decision: dict, characters: list) -> dict:
             "actor": enemy.character_name,
         }
 
-    # Find target
+    # Find target — must be an alive PC, never an ally
     target = find_character(characters, target_name)
-    if not target or target.hp_current <= 0:
-        # Target is down — pick a random alive PC
-        alive_pcs = [c for c in characters if not c.is_npc and not c.is_enemy and c.hp_current > 0]
+    alive_pcs = [c for c in characters if not c.is_npc and not c.is_enemy and c.hp_current > 0]
+
+    # Reject if target is another enemy (friendly fire), dead, or not found
+    if not target or target.hp_current <= 0 or target.is_enemy:
         if not alive_pcs:
             return {
                 "narration": f"\n{enemy.character_name} looks around but sees no standing foes.",
