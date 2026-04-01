@@ -228,24 +228,38 @@ async def process_action(
     # PHASE 3: Handle combat start as a SEPARATE event
     # ========================================================
     combat_start_event = None
-    if combat_trigger and not state_changes.get("combat_started"):
+    # combat_trigger means WE extracted the tag; combat_started means action_processor found one we missed
+    combat_just_started = combat_trigger or state_changes.get("combat_started")
+    if combat_just_started and not was_already_in_combat:
         from server.engine.combat import start_combat
 
-        campaign_id = session.campaign_id
-        characters = session.campaign.characters  # Refresh
-        combat_result = start_combat(
-            combat_trigger["enemies"], characters, game_state, campaign_id, db
-        )
-        db.commit()
+        if combat_trigger and game_state.game_mode != "combat":
+            # We extracted the tag — action_processor didn't see it, so we run start_combat
+            campaign_id = session.campaign_id
+            characters = session.campaign.characters
+            combat_result = start_combat(
+                combat_trigger["enemies"], characters, game_state, campaign_id, db
+            )
+            db.commit()
+            characters = session.campaign.characters
 
-        combat_start_event = {
-            "initiative_order": combat_result["initiative_order"],
-            "initiative_summary": combat_result["initiative_summary"],
-            "round": 1,
-        }
-
-        # Refresh characters again (start_combat created enemy Character rows)
-        characters = session.campaign.characters
+            combat_start_event = {
+                "initiative_order": combat_result["initiative_order"],
+                "initiative_summary": combat_result["initiative_summary"],
+                "round": 1,
+            }
+        elif game_state.game_mode == "combat" and game_state.initiative_order:
+            # action_processor already ran start_combat — build event from existing state
+            characters = session.campaign.characters
+            init_lines = [
+                f"{e['character_name']}: {e['initiative']}"
+                for e in game_state.initiative_order
+            ]
+            combat_start_event = {
+                "initiative_order": game_state.initiative_order,
+                "initiative_summary": "\n".join(init_lines),
+                "round": game_state.round_number or 1,
+            }
 
     # ========================================================
     # PHASE 4: Resolve enemy turns (only if appropriate)
