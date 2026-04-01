@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from server.auth import hash_password, verify_password, get_current_player
 from server.db.database import get_db
-from server.db.models import Campaign, Character, GameLog, GameState, Player
+from server.db.models import Campaign, Character, GameLog, GameState, JoinRequest, Player
 from server.db.models import Session as GameSession
 
 templates = Jinja2Templates(directory="templates")
@@ -111,6 +111,9 @@ def delete_item(
         character = db.query(Character).filter(Character.id == delete_id).first()
         if not character or character.player_id != player.id:
             return JSONResponse({"error": "Character not found."}, status_code=404)
+        # Null out FK references in game logs and join requests
+        db.query(GameLog).filter(GameLog.character_id == delete_id).update({"character_id": None})
+        db.query(JoinRequest).filter(JoinRequest.character_id == delete_id).delete()
         db.delete(character)
         db.commit()
         return JSONResponse({"success": True})
@@ -124,7 +127,8 @@ def delete_item(
         if campaign.owner_id != player.id:
             return JSONResponse({"error": "You don't own this campaign."}, status_code=403)
 
-        # Delete sessions, logs, game_state. Unassign characters (don't delete them).
+        # Delete join requests, sessions, logs, game_state. Unassign characters.
+        db.query(JoinRequest).filter(JoinRequest.campaign_id == campaign.id).delete()
         sessions = db.query(GameSession).filter(GameSession.campaign_id == campaign.id).all()
         for session in sessions:
             db.query(GameLog).filter(GameLog.session_id == session.id).delete()
