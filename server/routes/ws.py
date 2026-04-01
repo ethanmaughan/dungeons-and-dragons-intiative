@@ -137,16 +137,27 @@ async def websocket_session(ws: WebSocket, session_id: int):
 
                     log = result["log"]
 
-                    # Render narrative HTML for player's action
-                    html = templates.get_template("partials/narrative_entry.html").render(
-                        log=log,
-                    )
+                    # Broadcast player's narrative (if present — may be None for stuck-turn recovery)
+                    if log:
+                        html = templates.get_template("partials/narrative_entry.html").render(
+                            log=log,
+                        )
+                        await manager.broadcast(session_id, {
+                            "type": "narrative",
+                            "html": html,
+                        })
 
-                    # Broadcast player's narrative to ALL players
-                    await manager.broadcast(session_id, {
-                        "type": "narrative",
-                        "html": html,
-                    })
+                    # Broadcast combat start as a SEPARATE event (if combat just triggered)
+                    import asyncio
+                    if result.get("combat_start"):
+                        await asyncio.sleep(1.0)  # Dramatic pause after narration
+                        await manager.broadcast(session_id, {
+                            "type": "combat_start",
+                            "initiative_order": result["combat_start"]["initiative_order"],
+                            "initiative_summary": result["combat_start"]["initiative_summary"],
+                            "round": result["combat_start"]["round"],
+                        })
+                        await asyncio.sleep(1.5)  # Let players read initiative
 
                     # Broadcast enemy turns (if any, from combat auto-resolution)
                     for et in result.get("enemy_turns", []):
@@ -157,11 +168,9 @@ async def websocket_session(ws: WebSocket, session_id: int):
                             "type": "narrative",
                             "html": enemy_html,
                         })
-                        # Small delay between enemy turns for dramatic effect
-                        import asyncio
                         await asyncio.sleep(0.5)
 
-                    # Broadcast final state update (after all enemy turns)
+                    # Broadcast final state update (after all events)
                     await manager.broadcast(session_id, {
                         "type": "state_update",
                         "characters": result["characters"],

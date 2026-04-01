@@ -1,15 +1,11 @@
-"""Combat Orchestrator — resolves all enemy turns automatically after a player acts.
+"""Combat Orchestrator — resolves all enemy turns automatically.
 
-Flow:
-1. Player acts (processed by action_service)
-2. Orchestrator checks initiative order
-3. Advances turn. For each enemy turn:
-   a. Calls EnemyAgent for tactical decision
-   b. Executes the action mechanically (dice rolls, HP changes)
-   c. Generates narration text
-   d. Advances to next turn
-4. Stops when it's a PC's turn (returns accumulated results)
+After a player acts (or combat starts with enemies first), this walks
+the initiative order, calls an enemy agent for each enemy turn, executes
+the action mechanically, and stops when it reaches a PC's turn.
 """
+
+import traceback
 
 from server.ai.enemy_agent import get_enemy_decision
 from server.engine.combat import (
@@ -24,33 +20,34 @@ from server.engine.action_processor import find_character
 
 
 async def resolve_enemy_phase(game_state, characters: list, db) -> list[dict]:
-    """Resolve all enemy turns until it's a PC's turn.
+    """Resolve all consecutive enemy turns until it's a PC's turn.
 
-    Returns: list of {
-        "narration": str,
-        "dice_rolls": list,
-        "state_changes": dict,
-        "actor": str,
-    }
-    One entry per enemy turn resolved.
+    Returns list of result dicts, one per enemy turn resolved.
+    Always leaves current_turn_character_id pointing at the next PC.
     """
     results = []
-
-    # Safety limit to prevent infinite loops
     max_turns = len(game_state.initiative_order or []) * 2
     turns_resolved = 0
 
+    # If the CURRENT turn is already an enemy (combat just started, enemy won init),
+    # resolve it, then advance.
+    if is_enemy_turn(game_state):
+        result = await _resolve_current_enemy(game_state, characters)
+        if result:
+            results.append(result)
+        turns_resolved += 1
+
+    # Walk forward through initiative, resolving enemies, stopping at next PC
     while turns_resolved < max_turns:
-        # Advance to next turn
         next_entry = advance_turn(game_state)
         if not next_entry:
             break
 
-        # If it's a PC's turn, stop — wait for player input
+        # PC's turn — stop, let the player act
         if not next_entry.get("is_enemy", False):
             break
 
-        # Check if combat should end
+        # All enemies dead?
         if all_enemies_dead(characters):
             end_combat(game_state, characters, db)
             results.append({
@@ -61,25 +58,12 @@ async def resolve_enemy_phase(game_state, characters: list, db) -> list[dict]:
             })
             break
 
-        # Find the enemy character
-        enemy = None
-        for c in characters:
-            if c.id == next_entry["character_id"]:
-                enemy = c
-                break
+        # Resolve this enemy's turn
+        result = await _resolve_current_enemy(game_state, characters)
+        if result:
+            results.append(result)
 
-        if not enemy or enemy.hp_current <= 0:
-            turns_resolved += 1
-            continue
-
-        # Get the enemy's decision from the AI agent
-        decision = await get_enemy_decision(enemy, characters)
-
-        # Execute the decision
-        result = _execute_enemy_action(enemy, decision, characters)
-        results.append(result)
-
-        # Check if any PC is down — combat might end
+        # Check again after the enemy acted
         if all_enemies_dead(characters):
             end_combat(game_state, characters, db)
             results.append({
@@ -95,6 +79,34 @@ async def resolve_enemy_phase(game_state, characters: list, db) -> list[dict]:
     return results
 
 
+async def _resolve_current_enemy(game_state, characters: list) -> dict | None:
+    """Resolve the current turn's enemy action. Returns result dict or None."""
+    current_id = game_state.current_turn_character_id
+    enemy = next((c for c in characters if c.id == current_id), None)
+
+    if not enemy or enemy.hp_current <= 0 or not enemy.is_enemy:
+        return None
+
+    try:
+        decision = await get_enemy_decision(enemy, characters)
+        return _execute_enemy_action(enemy, decision, characters)
+    except Exception:
+        traceback.print_exc()
+        # Fallback: if the agent fails, do a basic attack so the turn isn't stuck
+        from server.ai.enemy_agent import _rule_decision
+        try:
+            decision = _rule_decision(enemy, characters)
+            return _execute_enemy_action(enemy, decision, characters)
+        except Exception:
+            traceback.print_exc()
+            return {
+                "narration": f"\n{enemy.character_name} hesitates, unsure what to do.",
+                "dice_rolls": [],
+                "state_changes": {},
+                "actor": enemy.character_name,
+            }
+
+
 def _execute_enemy_action(enemy, decision: dict, characters: list) -> dict:
     """Execute an enemy's combat action mechanically. Returns narration + state changes."""
     dice_rolls = []
@@ -106,7 +118,6 @@ def _execute_enemy_action(enemy, decision: dict, characters: list) -> dict:
     # Handle flee
     if action_name == "flee" or not target_name:
         narration = f"\n{enemy.character_name} turns and flees from the battle!"
-        # Mark enemy as out of combat (set HP to 0 to remove from initiative)
         enemy.hp_current = 0
         state_changes["fled"] = enemy.character_name
         return {
@@ -116,11 +127,11 @@ def _execute_enemy_action(enemy, decision: dict, characters: list) -> dict:
             "actor": enemy.character_name,
         }
 
-    # Find target
+    # Find target — must be an alive PC, never an ally
     target = find_character(characters, target_name)
-    if not target or target.hp_current <= 0:
-        # Target is down — pick a random alive PC
-        alive_pcs = [c for c in characters if not c.is_npc and not c.is_enemy and c.hp_current > 0]
+    alive_pcs = [c for c in characters if not c.is_npc and not c.is_enemy and c.hp_current > 0]
+
+    if not target or target.hp_current <= 0 or target.is_enemy:
         if not alive_pcs:
             return {
                 "narration": f"\n{enemy.character_name} looks around but sees no standing foes.",
@@ -131,9 +142,10 @@ def _execute_enemy_action(enemy, decision: dict, characters: list) -> dict:
         import secrets
         target = alive_pcs[secrets.randbelow(len(alive_pcs))]
 
-    # Use monster's actual attack bonus and damage from action data
-    atk_bonus = action_data.get("attack_bonus", get_enemy_monster_data(enemy).get("attack_bonus", 3))
-    damage_notation = action_data.get("damage", get_enemy_monster_data(enemy).get("damage", "1d6+1"))
+    # Use monster's actual attack bonus and damage
+    monster_data = get_enemy_monster_data(enemy)
+    atk_bonus = action_data.get("attack_bonus", monster_data.get("attack_bonus", 3))
+    damage_notation = action_data.get("damage", monster_data.get("damage", "1d6+1"))
     action_label = action_data.get("name", "attack")
 
     # Roll attack
@@ -154,8 +166,6 @@ def _execute_enemy_action(enemy, decision: dict, characters: list) -> dict:
     })
 
     if atk["critical"]:
-        # Critical: double the dice (not the modifier)
-        # Parse damage notation to double dice count
         crit_damage = _double_dice(damage_notation)
         dmg = roll(crit_damage)
         total_dmg = dmg["total"]
@@ -210,7 +220,6 @@ def _execute_enemy_action(enemy, decision: dict, characters: list) -> dict:
             f"Miss! (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac})"
         )
 
-    # Add special ability text if present
     special = action_data.get("special")
     if special and hit:
         narration += f"\n({special})"
@@ -224,7 +233,7 @@ def _execute_enemy_action(enemy, decision: dict, characters: list) -> dict:
 
 
 def _double_dice(notation: str) -> str:
-    """Double the dice count for critical hits. '1d6+2' → '2d6+2', '2d4+2' → '4d4+2'."""
+    """Double dice count for critical hits. '1d6+2' -> '2d6+2'."""
     import re
     match = re.match(r"(\d*)d(\d+)([+-]\d+)?", notation.strip().lower())
     if not match:

@@ -1,4 +1,13 @@
-"""Shared action processing logic used by both HTTP and WebSocket handlers."""
+"""Shared action processing logic used by both HTTP and WebSocket handlers.
+
+Combat flow:
+1. DM narrates encounter + emits [COMBAT:start:enemies] tag + STOPS
+2. We extract the tag, keep only narration BEFORE it
+3. Server creates enemies, rolls initiative, broadcasts as separate event
+4. Turn system takes over: enemy agents act in order, then PC is prompted
+"""
+
+import re
 
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session as DBSession
@@ -11,14 +20,20 @@ from server.engine.action_processor import process_dm_response
 
 templates = Jinja2Templates(directory="templates")
 
+# Patterns for extracting/stripping combat tags from DM response
+COMBAT_START_RE = re.compile(r"\[COMBAT:start:([^\]]+)\]")
+ENEMY_TAG_RE = re.compile(r"\[ENEMY_(?:TURN|ATTACK):[^\]]+\]")
+# The "--- COMBAT BEGINS ---...---" block that _handle_combat inserts
+COMBAT_BLOCK_RE = re.compile(
+    r"\n*---\s*COMBAT BEGINS\s*---.*?---\s*\n*",
+    re.DOTALL,
+)
+
 
 def _build_char_states(characters):
     """Build character state dicts for broadcasting."""
-    states = []
-    for c in characters:
-        if c.is_enemy and c.hp_current <= 0:
-            continue
-        states.append({
+    return [
+        {
             "id": c.id,
             "character_name": c.character_name,
             "hp_current": c.hp_current,
@@ -28,8 +43,10 @@ def _build_char_states(characters):
             "is_enemy": c.is_enemy,
             "is_npc": c.is_npc,
             "player_id": c.player_id,
-        })
-    return states
+        }
+        for c in characters
+        if not (c.is_enemy and c.hp_current <= 0)
+    ]
 
 
 def _build_gs_info(game_state):
@@ -44,19 +61,46 @@ def _build_gs_info(game_state):
     }
 
 
+def _extract_and_clean_combat(narration: str) -> tuple[str, list[str] | None]:
+    """Extract [COMBAT:start:enemies] and return (clean_narration, enemy_list_or_None).
+
+    Keeps ONLY text before the tag — everything after is truncated because
+    the server handles initiative, turn order, and prompting from here.
+    """
+    match = COMBAT_START_RE.search(narration)
+    if not match:
+        return narration, None
+
+    enemies = [e.strip() for e in match.group(1).split(",") if e.strip()]
+    # Keep only narration before the tag
+    clean = narration[:match.start()].rstrip()
+    return clean, enemies
+
+
+def _clean_combat_noise(narration: str) -> str:
+    """Strip all combat-related noise from narration:
+    - Enemy action tags (orchestrator handles these)
+    - The '--- COMBAT BEGINS ---' block (now a separate broadcast)
+    """
+    narration = ENEMY_TAG_RE.sub("", narration)
+    narration = COMBAT_BLOCK_RE.sub("", narration)
+    return narration.strip()
+
+
 async def process_action(
     session_id: int,
     player_id: int,
     action_text: str,
     db: DBSession,
 ) -> dict:
-    """Process a player action and return result dict.
+    """Process a player action. Returns structured result for broadcasting.
 
     Returns: {
-        "log": GameLog entry (player's action),
-        "characters": list of character state dicts for broadcasting,
-        "game_state": dict of current game state,
-        "enemy_turns": list of dicts for enemy turn results (combat only),
+        "log": GameLog,
+        "characters": [...],
+        "game_state": {...},
+        "combat_start": {...} or None,
+        "enemy_turns": [...],
     }
     """
     session = db.query(GameSession).filter(GameSession.id == session_id).first()
@@ -75,8 +119,6 @@ async def process_action(
     recent_logs.reverse()
 
     turn_number = len(recent_logs) + 1
-
-    # Find the acting character (the PC belonging to this player in this campaign)
     acting_character = (
         db.query(Character)
         .filter(
@@ -89,29 +131,56 @@ async def process_action(
     )
 
     is_character_creation = game_state and game_state.game_mode == "character_creation"
+    was_already_in_combat = game_state and game_state.game_mode == "combat"
 
-    # --- Turn locking: in combat, only the player whose character's turn it is can act ---
+    # --- Turn locking ---
     if (
-        game_state
-        and game_state.game_mode == "combat"
+        was_already_in_combat
         and not is_character_creation
         and acting_character
         and game_state.current_turn_character_id
     ):
         current_turn_id = game_state.current_turn_character_id
-        # Check if it's this player's character's turn
         if current_turn_id != acting_character.id:
-            # Check if current turn belongs to ANY PC (flexible: any player can act on a PC turn)
-            # but reject if it's an enemy's turn
-            current_entry = None
-            for entry in (game_state.initiative_order or []):
-                if entry["character_id"] == current_turn_id:
-                    current_entry = entry
-                    break
+            current_entry = next(
+                (e for e in (game_state.initiative_order or [])
+                 if e["character_id"] == current_turn_id),
+                None,
+            )
             if current_entry and current_entry.get("is_enemy", False):
-                return {"error": "It's not your turn — enemies are acting"}
+                # Enemy's turn — try to resolve stuck enemy turns instead of rejecting
+                from server.ai.combat_orchestrator import resolve_enemy_phase
+                characters = session.campaign.characters
+                enemy_results = await resolve_enemy_phase(game_state, characters, db)
+                enemy_turn_results = []
+                for er in enemy_results:
+                    enemy_log = GameLog(
+                        session_id=session_id,
+                        turn_number=turn_number,
+                        actor=er["actor"],
+                        narration_text=er["narration"],
+                        dice_rolls=er["dice_rolls"],
+                        state_changes=er["state_changes"],
+                        game_mode="combat",
+                    )
+                    db.add(enemy_log)
+                    enemy_turn_results.append({
+                        "log": enemy_log,
+                        "narration": er["narration"],
+                        "actor": er["actor"],
+                    })
+                if enemy_turn_results:
+                    db.commit()
+                # Return the resolved enemy turns + updated state so the client unblocks
+                return {
+                    "log": None,
+                    "characters": _build_char_states(characters),
+                    "game_state": _build_gs_info(game_state),
+                    "combat_start": None,
+                    "enemy_turns": enemy_turn_results,
+                }
 
-    # Handle character creation step logic
+    # --- Character creation ---
     if is_character_creation:
         current_step = game_state.creation_step or "greeting"
         pc = acting_character or next((c for c in characters if not c.is_npc and not c.is_enemy), None)
@@ -127,12 +196,7 @@ async def process_action(
             elif current_step == "name":
                 pc.character_name = player_answer.title()
             elif current_step == "confirm":
-                current_choices = {
-                    "race": pc.race,
-                    "class": pc.char_class,
-                    "name": pc.character_name,
-                }
-                finalize_character(pc, current_choices, game_state)
+                finalize_character(pc, {"race": pc.race, "class": pc.char_class, "name": pc.character_name}, game_state)
 
         step_order = ["greeting", "race", "class", "abilities", "name", "confirm", "done"]
         try:
@@ -141,31 +205,42 @@ async def process_action(
         except ValueError:
             game_state.creation_step = "race"
 
-    # Prefix action with character name for multiplayer context
+    # --- Call DM ---
     action_for_ai = action_text
     if acting_character and not is_character_creation:
         action_for_ai = f"[{acting_character.character_name}]: {action_text}"
 
-    # Call the DM orchestrator
     narration = await process_player_action(
         action=action_for_ai,
         campaign=session.campaign,
         game_state=game_state,
         characters=characters,
         recent_logs=recent_logs,
-        mode="character_creation" if is_character_creation and game_state.game_mode == "character_creation" else "play",
+        mode="character_creation" if is_character_creation else "play",
     )
 
-    # Process action tags for non-creation modes
+    # ==========================================================
+    # PHASE 1 — Extract combat trigger, clean narration
+    # ==========================================================
+    combat_enemies = None
+    if not is_character_creation:
+        narration, combat_enemies = _extract_and_clean_combat(narration)
+        narration = _clean_combat_noise(narration)
+
+    # ==========================================================
+    # PHASE 2 — Process remaining tags (rolls, HP, spells, etc.)
+    # ==========================================================
     dice_rolls = []
     state_changes = {}
     if not is_character_creation:
         result = process_dm_response(narration, characters, game_state, db)
         narration = result["narration"]
+        # Strip any combat block that _handle_combat might have inserted
+        narration = _clean_combat_noise(narration)
         dice_rolls = result["dice_rolls"]
         state_changes = result["state_changes"]
 
-    # Save player action to game log
+    # Save the DM's narrative to game log
     actor_name = acting_character.character_name if acting_character else "Player"
     log_entry = GameLog(
         session_id=session_id,
@@ -181,45 +256,81 @@ async def process_action(
     db.add(log_entry)
     db.commit()
 
-    # --- Auto-resolve enemy turns if in combat ---
+    # ==========================================================
+    # PHASE 3 — Combat start (separate event)
+    # ==========================================================
+    combat_start_event = None
+    combat_just_started = bool(combat_enemies) or state_changes.get("combat_started")
+
+    if combat_just_started and not was_already_in_combat:
+        from server.engine.combat import start_combat
+
+        if game_state.game_mode != "combat":
+            # We need to call start_combat (our extraction prevented _handle_combat)
+            characters = session.campaign.characters
+            combat_result = start_combat(
+                combat_enemies or [], characters, game_state, session.campaign_id, db
+            )
+            db.commit()
+            characters = session.campaign.characters
+        else:
+            # _handle_combat already ran start_combat — just read the state
+            characters = session.campaign.characters
+
+        if game_state.initiative_order:
+            init_lines = [
+                f"{e['character_name']}: {e['initiative']}"
+                for e in game_state.initiative_order
+            ]
+            combat_start_event = {
+                "initiative_order": game_state.initiative_order,
+                "initiative_summary": "\n".join(init_lines),
+                "round": game_state.round_number or 1,
+            }
+
+    # ==========================================================
+    # PHASE 4 — Resolve enemy turns via the turn system
+    # ==========================================================
     enemy_turn_results = []
-    if (
-        game_state
-        and game_state.game_mode == "combat"
-        and not is_character_creation
-        and not state_changes.get("combat_ended")
-    ):
+    if game_state and game_state.game_mode == "combat" and not is_character_creation:
         from server.ai.combat_orchestrator import resolve_enemy_phase
 
-        # Refresh characters list (combat may have created new enemies)
-        characters = session.campaign.characters
-        enemy_results = await resolve_enemy_phase(game_state, characters, db)
+        should_resolve = False
 
-        for er in enemy_results:
-            # Save each enemy turn to game log
-            enemy_log = GameLog(
-                session_id=session_id,
-                turn_number=turn_number,
-                actor=er["actor"],
-                action_text=None,
-                narration_text=er["narration"],
-                dice_rolls=er["dice_rolls"],
-                state_changes=er["state_changes"],
-                game_mode=game_state.game_mode if game_state else "combat",
-            )
-            db.add(enemy_log)
-            enemy_turn_results.append({
-                "log": enemy_log,
-                "narration": er["narration"],
-                "actor": er["actor"],
-            })
+        if combat_start_event:
+            # Combat JUST started. Resolve enemies only if they go first.
+            first = (game_state.initiative_order or [{}])[0]
+            should_resolve = first.get("is_enemy", False)
+        elif was_already_in_combat and not state_changes.get("combat_ended"):
+            # Normal turn: player just acted, resolve enemies until next PC
+            should_resolve = True
 
-        if enemy_turn_results:
-            db.commit()
+        if should_resolve:
+            characters = session.campaign.characters
+            enemy_results = await resolve_enemy_phase(game_state, characters, db)
+            for er in enemy_results:
+                enemy_log = GameLog(
+                    session_id=session_id,
+                    turn_number=turn_number,
+                    actor=er["actor"],
+                    narration_text=er["narration"],
+                    dice_rolls=er["dice_rolls"],
+                    state_changes=er["state_changes"],
+                    game_mode="combat",
+                )
+                db.add(enemy_log)
+                enemy_turn_results.append({
+                    "log": enemy_log,
+                    "narration": er["narration"],
+                    "actor": er["actor"],
+                })
+            if enemy_turn_results:
+                db.commit()
 
     return {
         "log": log_entry,
         "characters": _build_char_states(characters),
         "game_state": _build_gs_info(game_state),
+        "combat_start": combat_start_event,
         "enemy_turns": enemy_turn_results,
     }
