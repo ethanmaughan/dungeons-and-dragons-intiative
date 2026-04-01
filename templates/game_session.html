@@ -20,6 +20,14 @@
         opacity: 1;
         pointer-events: auto;
     }
+    .online-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .online-dot.connected { background-color: #22c55e; }
+    .online-dot.disconnected { background-color: #6b7280; }
 </style>
 {% endblock %}
 
@@ -33,15 +41,17 @@
             </button>
             <div>
                 <h1 class="text-xl gold-text font-bold">{{ session.campaign.name }}</h1>
-                <span class="text-sm text-gray-400">Session {{ session.session_number }} — {{ game_state.game_mode | capitalize if game_state else 'Exploration' }}</span>
+                <span class="text-sm text-gray-400">Session {{ session.session_number }} — <span id="game-mode-label">{{ game_state.game_mode | capitalize if game_state else 'Exploration' }}</span></span>
             </div>
         </div>
-        <div class="flex gap-4 text-sm">
+        <div class="flex gap-4 text-sm items-center">
+            <span id="connection-status" class="text-xs text-gray-500">Connecting...</span>
+            <span id="online-count" class="text-xs text-gray-500"></span>
             {% for c in characters %}
                 {% if not c.is_npc and not c.is_enemy %}
                 <a href="/character/{{ c.id }}" class="parchment rounded px-3 py-1 hover:border-yellow-700 transition-colors">
                     <span class="gold-text">{{ c.character_name }}</span>
-                    <span class="text-red-400 ml-1">{{ c.hp_current }}/{{ c.hp_max }} HP</span>
+                    <span class="text-red-400 ml-1" id="header-hp-{{ c.id }}">{{ c.hp_current }}/{{ c.hp_max }} HP</span>
                 </a>
                 {% endif %}
             {% endfor %}
@@ -64,151 +74,180 @@
                 <a href="/dashboard" class="block px-3 py-2 rounded text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors">
                     &#127968; Dashboard
                 </a>
-                {% for c in characters %}
-                    {% if not c.is_npc and not c.is_enemy %}
-                    <a href="/character/{{ c.id }}" class="block px-3 py-2 rounded text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors">
-                        &#128100; {{ c.character_name }}
-                    </a>
-                    {% endif %}
-                {% endfor %}
+                {% if my_character %}
+                <a href="/character/{{ my_character.id }}" class="block px-3 py-2 rounded text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors">
+                    &#128100; {{ my_character.character_name }}
+                </a>
+                {% endif %}
             </nav>
+
+            <!-- Initiative Tracker -->
+            {% include "partials/initiative_tracker.html" %}
 
             <!-- Party -->
             <div class="border-t border-gray-700 pt-4 mb-6">
                 <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Party</h3>
+                <div id="party-panel">
                 {% for c in characters %}
                     {% if not c.is_npc and not c.is_enemy %}
-                    <div class="mb-3">
+                    <div class="mb-3" id="party-member-{{ c.id }}">
                         <div class="flex items-center justify-between">
-                            <span class="gold-text text-sm font-bold">{{ c.character_name }}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="online-dot disconnected" id="online-dot-{{ c.player_id }}"></span>
+                                <span class="gold-text text-sm font-bold">{{ c.character_name }}</span>
+                                {% if my_character and c.id == my_character.id %}
+                                <span class="text-xs text-blue-400">(You)</span>
+                                {% endif %}
+                            </div>
                             <span class="text-xs text-gray-500">{{ c.race }} {{ c.char_class }}</span>
                         </div>
                         <div class="mt-1 bg-gray-800 rounded-full h-2 overflow-hidden">
                             {% set hp_pct = (c.hp_current / c.hp_max * 100) if c.hp_max > 0 else 0 %}
-                            <div class="h-full rounded-full {% if hp_pct > 50 %}bg-green-600{% elif hp_pct > 25 %}bg-yellow-600{% else %}bg-red-600{% endif %}"
-                                 style="width: {{ hp_pct }}%"></div>
+                            <div class="h-full rounded-full hp-bar-fill" id="hp-bar-{{ c.id }}"
+                                 style="width: {{ hp_pct }}%; background-color: {% if hp_pct > 50 %}#16a34a{% elif hp_pct > 25 %}#ca8a04{% else %}#dc2626{% endif %};"></div>
                         </div>
-                        <div class="text-xs text-gray-500 mt-0.5">{{ c.hp_current }}/{{ c.hp_max }} HP &middot; AC {{ c.ac }}</div>
-                        {% if c.conditions %}
-                        <div class="flex flex-wrap gap-1 mt-1">
+                        <div class="text-xs text-gray-500 mt-0.5" id="hp-text-{{ c.id }}">{{ c.hp_current }}/{{ c.hp_max }} HP &middot; AC {{ c.ac }}</div>
+                        <div class="flex flex-wrap gap-1 mt-1" id="conditions-{{ c.id }}">
+                            {% if c.conditions %}
                             {% for cond in c.conditions %}
                             <span class="bg-red-900/50 text-red-300 text-xs px-1.5 py-0.5 rounded">{{ cond }}</span>
                             {% endfor %}
+                            {% endif %}
                         </div>
-                        {% endif %}
                     </div>
                     {% endif %}
                 {% endfor %}
 
+                <!-- Enemies (shown in combat) -->
+                <div id="enemy-panel" class="{% if not game_state or game_state.game_mode != 'combat' %}hidden{% endif %}">
+                    <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-2 mt-4">Enemies</h3>
+                    <div id="enemy-list">
+                    {% for c in characters %}
+                        {% if c.is_enemy and c.hp_current > 0 %}
+                        <div class="mb-2" id="enemy-{{ c.id }}">
+                            <div class="flex items-center justify-between">
+                                <span class="text-red-400 text-sm font-bold">{{ c.character_name }}</span>
+                                <span class="text-xs text-gray-500">AC {{ c.ac }}</span>
+                            </div>
+                            <div class="mt-1 bg-gray-800 rounded-full h-2 overflow-hidden">
+                                {% set hp_pct = (c.hp_current / c.hp_max * 100) if c.hp_max > 0 else 0 %}
+                                <div class="h-full rounded-full bg-red-600" id="hp-bar-{{ c.id }}" style="width: {{ hp_pct }}%"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-0.5" id="hp-text-{{ c.id }}">{{ c.hp_current }}/{{ c.hp_max }} HP</div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                    </div>
+                </div>
+                </div>
             </div>
 
-            <!-- Character Sheet -->
-            {% for c in characters %}
-                {% if not c.is_npc and not c.is_enemy %}
-                <div class="border-t border-gray-700 pt-4 mb-6">
-                    <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Character Sheet</h3>
+            <!-- Character Sheet (my character only) -->
+            {% if my_character %}
+            {% set c = my_character %}
+            <div class="border-t border-gray-700 pt-4 mb-6">
+                <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Character Sheet</h3>
 
-                    <!-- Combat Stats -->
-                    <div class="grid grid-cols-3 gap-2 mb-3">
-                        <div class="text-center parchment rounded p-1.5">
-                            <div class="text-lg font-bold text-red-400">{{ c.hp_current }}/{{ c.hp_max }}</div>
-                            <div class="text-xs text-gray-500">HP</div>
-                        </div>
-                        <div class="text-center parchment rounded p-1.5">
-                            <div class="text-lg font-bold gold-text">{{ c.ac }}</div>
-                            <div class="text-xs text-gray-500">AC</div>
-                        </div>
-                        <div class="text-center parchment rounded p-1.5">
-                            <div class="text-lg font-bold text-blue-400">+{{ c.proficiency_bonus }}</div>
-                            <div class="text-xs text-gray-500">Prof</div>
+                <!-- Combat Stats -->
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <div class="text-center parchment rounded p-1.5">
+                        <div class="text-lg font-bold text-red-400" id="sheet-hp">{{ c.hp_current }}/{{ c.hp_max }}</div>
+                        <div class="text-xs text-gray-500">HP</div>
+                    </div>
+                    <div class="text-center parchment rounded p-1.5">
+                        <div class="text-lg font-bold gold-text">{{ c.ac }}</div>
+                        <div class="text-xs text-gray-500">AC</div>
+                    </div>
+                    <div class="text-center parchment rounded p-1.5">
+                        <div class="text-lg font-bold text-blue-400">+{{ c.proficiency_bonus }}</div>
+                        <div class="text-xs text-gray-500">Prof</div>
+                    </div>
+                </div>
+
+                <!-- Ability Scores -->
+                <div class="grid grid-cols-6 gap-1 mb-3">
+                    {% set abilities = [
+                        ("STR", c.str_score),
+                        ("DEX", c.dex_score),
+                        ("CON", c.con_score),
+                        ("INT", c.int_score),
+                        ("WIS", c.wis_score),
+                        ("CHA", c.cha_score)
+                    ] %}
+                    {% for name, score in abilities %}
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500">{{ name }}</div>
+                        <div class="text-sm font-bold">{{ score }}</div>
+                        <div class="text-xs gold-text">
+                            {% set mod = (score - 10) // 2 %}{% if mod >= 0 %}+{% endif %}{{ mod }}
                         </div>
                     </div>
+                    {% endfor %}
+                </div>
 
-                    <!-- Ability Scores -->
-                    <div class="grid grid-cols-6 gap-1 mb-3">
-                        {% set abilities = [
-                            ("STR", c.str_score),
-                            ("DEX", c.dex_score),
-                            ("CON", c.con_score),
-                            ("INT", c.int_score),
-                            ("WIS", c.wis_score),
-                            ("CHA", c.cha_score)
-                        ] %}
-                        {% for name, score in abilities %}
-                        <div class="text-center">
-                            <div class="text-xs text-gray-500">{{ name }}</div>
-                            <div class="text-sm font-bold">{{ score }}</div>
-                            <div class="text-xs gold-text">
-                                {% set mod = (score - 10) // 2 %}{% if mod >= 0 %}+{% endif %}{{ mod }}
-                            </div>
-                        </div>
+                <!-- Spells -->
+                {% if c.spells %}
+                <div class="mb-3">
+                    <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Spells</h4>
+                    <div class="space-y-0.5">
+                        {% for spell in c.spells %}
+                        <div class="text-xs text-purple-300">{{ spell }}</div>
                         {% endfor %}
                     </div>
-
-                    <!-- Spells -->
-                    {% if c.spells %}
-                    <div class="mb-3">
-                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Spells</h4>
-                        <div class="space-y-0.5">
-                            {% for spell in c.spells %}
-                            <div class="text-xs text-purple-300">{{ spell }}</div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Inventory -->
-                    <div class="mb-3">
-                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Inventory</h4>
-                        {% if c.inventory %}
-                        <div class="space-y-0.5">
-                            {% for item in c.inventory %}
-                            <div class="text-xs text-gray-300">{{ item }}</div>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        <div class="text-xs text-gray-600 italic">Empty</div>
-                        {% endif %}
-                    </div>
-
-                    <!-- Features -->
-                    {% if c.features %}
-                    <div class="mb-3">
-                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Features</h4>
-                        <div class="space-y-0.5">
-                            {% for feat in c.features %}
-                            <div class="text-xs text-gray-300">{{ feat }}</div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Conditions -->
-                    {% if c.conditions %}
-                    <div class="mb-3">
-                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Conditions</h4>
-                        <div class="flex flex-wrap gap-1">
-                            {% for cond in c.conditions %}
-                            <span class="bg-red-900/50 text-red-300 text-xs px-1.5 py-0.5 rounded">{{ cond }}</span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Spell Slots -->
-                    {% if c.spell_slots %}
-                    <div class="mb-3">
-                        <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Spell Slots</h4>
-                        <div class="space-y-0.5">
-                            {% for level, slots in c.spell_slots.items() %}
-                            <div class="text-xs text-gray-400">Lvl {{ level }}: {{ slots }}</div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
                 {% endif %}
-            {% endfor %}
+
+                <!-- Inventory -->
+                <div class="mb-3">
+                    <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Inventory</h4>
+                    {% if c.inventory %}
+                    <div class="space-y-0.5">
+                        {% for item in c.inventory %}
+                        <div class="text-xs text-gray-300">{{ item }}</div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-xs text-gray-600 italic">Empty</div>
+                    {% endif %}
+                </div>
+
+                <!-- Features -->
+                {% if c.features %}
+                <div class="mb-3">
+                    <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Features</h4>
+                    <div class="space-y-0.5">
+                        {% for feat in c.features %}
+                        <div class="text-xs text-gray-300">{{ feat }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Conditions -->
+                {% if c.conditions %}
+                <div class="mb-3">
+                    <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Conditions</h4>
+                    <div class="flex flex-wrap gap-1">
+                        {% for cond in c.conditions %}
+                        <span class="bg-red-900/50 text-red-300 text-xs px-1.5 py-0.5 rounded">{{ cond }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Spell Slots -->
+                {% if c.spell_slots %}
+                <div class="mb-3">
+                    <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Spell Slots</h4>
+                    <div class="space-y-0.5">
+                        {% for level, slots in c.spell_slots.items() %}
+                        <div class="text-xs text-gray-400">Lvl {{ level }}: {{ slots }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
 
             <!-- Game Info -->
             <div class="border-t border-gray-700 pt-4">
@@ -216,9 +255,9 @@
                 <div class="text-sm space-y-1">
                     <div class="text-gray-400">Campaign: <span class="text-gray-300">{{ session.campaign.name }}</span></div>
                     <div class="text-gray-400">Session: <span class="text-gray-300">#{{ session.session_number }}</span></div>
-                    <div class="text-gray-400">Mode: <span class="text-gray-300">{{ game_state.game_mode | capitalize if game_state else 'Exploration' }}</span></div>
+                    <div class="text-gray-400">Mode: <span class="text-gray-300" id="sidebar-game-mode">{{ game_state.game_mode | capitalize if game_state else 'Exploration' }}</span></div>
                     {% if game_state and game_state.game_mode == 'combat' %}
-                    <div class="text-gray-400">Round: <span class="text-gray-300">{{ game_state.round_number }}</span></div>
+                    <div class="text-gray-400">Round: <span class="text-gray-300" id="sidebar-round">{{ game_state.round_number }}</span></div>
                     {% endif %}
                 </div>
             </div>
@@ -242,23 +281,20 @@
                 {% include "partials/narrative_entry.html" %}
             {% endfor %}
         </div>
+
+        <!-- System notifications (player join/leave) -->
+        <div id="notifications"></div>
     </div>
 
     <!-- Action Bar -->
     <div class="parchment px-4 py-4 border-t border-gray-700">
-        <form id="action-form"
-              hx-post="/api/action/{{ session.id }}"
-              hx-target="#narrative-content"
-              hx-swap="beforeend"
-              hx-on::after-request="onActionComplete()"
-              hx-disabled-elt="#send-btn"
-              class="flex gap-3">
-            <input type="text" name="action" id="action-input"
+        <div id="action-bar" class="flex gap-3">
+            <input type="text" id="action-input"
                    placeholder="{% if game_state and game_state.game_mode == 'character_creation' %}Say hello to begin character creation...{% elif game_state and game_state.game_mode == 'combat' %}It's your turn! Describe your action...{% else %}What do you do?{% endif %}"
                    class="action-input flex-1 rounded px-4 py-3 text-lg"
                    autocomplete="off"
                    required>
-            <button type="submit" id="send-btn"
+            <button type="button" id="send-btn" onclick="sendAction()"
                     class="btn-action rounded px-6 py-3 text-lg font-bold">
                 Send
             </button>
@@ -266,63 +302,159 @@
                     onclick="toggleTTS()"
                     class="rounded px-4 py-3 text-sm border border-gray-600 hover:border-yellow-600"
                     title="Toggle voice narration">
-                🔇
+                &#128263;
             </button>
-        </form>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+    // --- State ---
     let ttsEnabled = false;
     let sidebarOpen = false;
+    let ws = null;
+    let wsReconnectTimer = null;
+    let actionPending = false;
+    const SESSION_ID = {{ session.id }};
+    const MY_CHARACTER_ID = {{ my_character.id if my_character else 'null' }};
 
+    // --- Sidebar ---
     function toggleSidebar() {
         sidebarOpen = !sidebarOpen;
         document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
         document.getElementById('sidebar-overlay').classList.toggle('open', sidebarOpen);
     }
 
+    // --- TTS ---
     function toggleTTS() {
         ttsEnabled = !ttsEnabled;
         const btn = document.getElementById('tts-toggle');
-        btn.textContent = ttsEnabled ? '🔊' : '🔇';
+        btn.innerHTML = ttsEnabled ? '&#128264;' : '&#128263;';
         btn.classList.toggle('border-yellow-500', ttsEnabled);
-
-        if (!ttsEnabled) {
-            speechSynthesis.cancel();
-        }
+        if (!ttsEnabled) speechSynthesis.cancel();
     }
 
     function speakNarration(text) {
         if (!ttsEnabled || !text) return;
-
         speechSynthesis.cancel();
-
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 0.95;
         utterance.pitch = 0.9;
-
         const voices = speechSynthesis.getVoices();
         const preferred = voices.find(v =>
             v.name.includes('David') || v.name.includes('Daniel') ||
             v.name.includes('Male') || v.name.includes('Google UK English Male')
         );
         if (preferred) utterance.voice = preferred;
-
         speechSynthesis.speak(utterance);
     }
 
-    function onActionComplete() {
+    // --- WebSocket ---
+    function connectWebSocket() {
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${location.host}/ws/session/${SESSION_ID}`);
+
+        ws.onopen = function() {
+            document.getElementById('connection-status').textContent = 'Connected';
+            document.getElementById('connection-status').className = 'text-xs text-green-500';
+            if (wsReconnectTimer) {
+                clearTimeout(wsReconnectTimer);
+                wsReconnectTimer = null;
+            }
+        };
+
+        ws.onclose = function() {
+            document.getElementById('connection-status').textContent = 'Disconnected';
+            document.getElementById('connection-status').className = 'text-xs text-red-500';
+            // Auto-reconnect after 3 seconds
+            wsReconnectTimer = setTimeout(connectWebSocket, 3000);
+        };
+
+        ws.onerror = function() {
+            document.getElementById('connection-status').textContent = 'Error';
+            document.getElementById('connection-status').className = 'text-xs text-red-500';
+        };
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            handleWSMessage(data);
+        };
+    }
+
+    function handleWSMessage(data) {
+        switch (data.type) {
+            case 'connected':
+                updateOnlineDots(data.online_players);
+                break;
+
+            case 'narrative':
+                appendNarrative(data.html);
+                actionPending = false;
+                updateSendButton();
+                break;
+
+            case 'state_update':
+                updateCharacterStates(data.characters);
+                updateGameState(data.game_state);
+                break;
+
+            case 'player_joined':
+                showNotification(`${data.character_name || data.player_name} joined the session`);
+                updateOnlineDots(data.online_players);
+                break;
+
+            case 'player_left':
+                showNotification(`${data.character_name || data.player_name} left the session`);
+                updateOnlineDots(data.online_players);
+                break;
+
+            case 'error':
+                showNotification(`Error: ${data.message}`, true);
+                actionPending = false;
+                updateSendButton();
+                break;
+
+            case 'pong':
+                break;
+        }
+    }
+
+    // --- Actions ---
+    function sendAction() {
         const input = document.getElementById('action-input');
+        const text = input.value.trim();
+        if (!text || !ws || ws.readyState !== WebSocket.OPEN || actionPending) return;
+
+        actionPending = true;
+        updateSendButton();
+
+        ws.send(JSON.stringify({
+            type: 'action',
+            text: text,
+        }));
+
         input.value = '';
         input.focus();
+    }
+
+    function updateSendButton() {
+        const btn = document.getElementById('send-btn');
+        btn.disabled = actionPending;
+        btn.textContent = actionPending ? 'Waiting...' : 'Send';
+    }
+
+    // --- UI Updates ---
+    function appendNarrative(html) {
+        const content = document.getElementById('narrative-content');
+        content.insertAdjacentHTML('beforeend', html);
 
         const panel = document.getElementById('narrative-panel');
         panel.scrollTop = panel.scrollHeight;
 
-        const entries = document.querySelectorAll('#narrative-content .dm-narration');
+        // TTS for latest narration
+        const entries = content.querySelectorAll('.dm-narration');
         if (entries.length > 0) {
             const latest = entries[entries.length - 1];
             const text = latest.querySelector('.whitespace-pre-wrap')?.textContent;
@@ -330,22 +462,147 @@
         }
     }
 
+    function updateCharacterStates(characters) {
+        if (!characters) return;
+        for (const c of characters) {
+            // Update HP bar
+            const hpBar = document.getElementById(`hp-bar-${c.id}`);
+            const hpText = document.getElementById(`hp-text-${c.id}`);
+            const headerHp = document.getElementById(`header-hp-${c.id}`);
+
+            if (hpBar && c.hp_max > 0) {
+                const pct = (c.hp_current / c.hp_max * 100);
+                hpBar.style.width = pct + '%';
+                if (pct > 50) hpBar.style.backgroundColor = '#16a34a';
+                else if (pct > 25) hpBar.style.backgroundColor = '#ca8a04';
+                else hpBar.style.backgroundColor = '#dc2626';
+            }
+            if (hpText) {
+                hpText.textContent = `${c.hp_current}/${c.hp_max} HP` + (c.ac ? ` · AC ${c.ac}` : '');
+            }
+            if (headerHp) {
+                headerHp.textContent = `${c.hp_current}/${c.hp_max} HP`;
+            }
+
+            // Update sheet HP if it's my character
+            if (c.id === MY_CHARACTER_ID) {
+                const sheetHp = document.getElementById('sheet-hp');
+                if (sheetHp) sheetHp.textContent = `${c.hp_current}/${c.hp_max}`;
+            }
+
+            // Update conditions
+            const condEl = document.getElementById(`conditions-${c.id}`);
+            if (condEl && c.conditions) {
+                condEl.innerHTML = c.conditions.map(cond =>
+                    `<span class="bg-red-900/50 text-red-300 text-xs px-1.5 py-0.5 rounded">${cond}</span>`
+                ).join('');
+            }
+        }
+    }
+
+    function updateGameState(gs) {
+        if (!gs) return;
+
+        // Update mode labels
+        const modeLabel = document.getElementById('game-mode-label');
+        const sidebarMode = document.getElementById('sidebar-game-mode');
+        if (modeLabel) modeLabel.textContent = gs.game_mode.charAt(0).toUpperCase() + gs.game_mode.slice(1);
+        if (sidebarMode) sidebarMode.textContent = gs.game_mode.charAt(0).toUpperCase() + gs.game_mode.slice(1);
+
+        // Initiative tracker
+        const tracker = document.getElementById('initiative-tracker');
+        const enemyPanel = document.getElementById('enemy-panel');
+        if (gs.game_mode === 'combat') {
+            if (tracker) tracker.classList.remove('hidden');
+            if (enemyPanel) enemyPanel.classList.remove('hidden');
+
+            // Update round number
+            const roundEl = document.getElementById('round-number');
+            if (roundEl) roundEl.textContent = gs.round_number;
+
+            // Update initiative list
+            const initList = document.getElementById('initiative-list');
+            if (initList && gs.initiative_order) {
+                initList.innerHTML = gs.initiative_order.map(entry => {
+                    const isCurrent = gs.current_turn_character_id === entry.character_id;
+                    const nameClass = entry.is_enemy ? 'text-red-400' : 'gold-text';
+                    return `
+                        <div class="flex items-center justify-between px-2 py-1 rounded text-sm
+                                    ${isCurrent ? 'bg-yellow-900/40 border border-yellow-700' : ''}"
+                             data-character-id="${entry.character_id}">
+                            <div class="flex items-center gap-2">
+                                ${isCurrent ? '<span class="text-yellow-400">&#9654;</span>' : ''}
+                                <span class="${nameClass} font-bold">${entry.character_name}</span>
+                            </div>
+                            <span class="text-gray-500 text-xs">${entry.initiative}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+        } else {
+            if (tracker) tracker.classList.add('hidden');
+            if (enemyPanel) enemyPanel.classList.add('hidden');
+        }
+    }
+
+    function updateOnlineDots(playerIds) {
+        if (!playerIds) return;
+        // Reset all dots
+        document.querySelectorAll('.online-dot').forEach(dot => {
+            dot.classList.remove('connected');
+            dot.classList.add('disconnected');
+        });
+        // Light up online players
+        for (const pid of playerIds) {
+            const dot = document.getElementById(`online-dot-${pid}`);
+            if (dot) {
+                dot.classList.remove('disconnected');
+                dot.classList.add('connected');
+            }
+        }
+        // Update count
+        const countEl = document.getElementById('online-count');
+        if (countEl) countEl.textContent = `${playerIds.length} online`;
+    }
+
+    function showNotification(text, isError = false) {
+        const container = document.getElementById('notifications');
+        const el = document.createElement('div');
+        el.className = `text-xs text-center py-1 ${isError ? 'text-red-400' : 'text-gray-500'} italic`;
+        el.textContent = text;
+        container.appendChild(el);
+
+        const panel = document.getElementById('narrative-panel');
+        panel.scrollTop = panel.scrollHeight;
+
+        // Auto-remove after 10 seconds
+        setTimeout(() => el.remove(), 10000);
+    }
+
+    // --- Keepalive ---
+    setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+        }
+    }, 30000);
+
+    // --- Init ---
     speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
 
     window.addEventListener('load', function() {
         const panel = document.getElementById('narrative-panel');
         panel.scrollTop = panel.scrollHeight;
         document.getElementById('action-input').focus();
+        connectWebSocket();
     });
 
     document.getElementById('action-input').addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            document.getElementById('action-form').requestSubmit();
+            sendAction();
         }
     });
 
-    // Close sidebar on Escape
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && sidebarOpen) {
             toggleSidebar();

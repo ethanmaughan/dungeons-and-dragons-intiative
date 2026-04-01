@@ -1,0 +1,237 @@
+"""Per-enemy AI agent that makes tactical combat decisions.
+
+Each enemy gets a lightweight Claude Haiku call to choose its action and target,
+based on its stats, personality/tactics, and the current battlefield state.
+Falls back to a rule-based engine if AI is unavailable.
+"""
+
+import json
+import traceback
+
+from server.config import AI_BACKEND, ANTHROPIC_API_KEY, ENEMY_AGENT_MODEL, OLLAMA_MODEL
+from server.engine.combat import get_enemy_monster_data
+from server.engine.dice import ability_modifier
+
+if AI_BACKEND == "claude":
+    import anthropic
+    _agent_client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+
+
+# ---- Frontline classification for proximity-based targeting ----
+FRONTLINE_CLASSES = {"fighter", "barbarian", "paladin", "ranger", "monk"}
+BACKLINE_CLASSES = {"wizard", "sorcerer", "warlock", "bard", "cleric", "druid"}
+
+
+def _classify_position(char_class: str) -> str:
+    """Classify a character as front/back based on class."""
+    cls = char_class.lower()
+    if cls in FRONTLINE_CLASSES:
+        return "front"
+    if cls in BACKLINE_CLASSES:
+        return "back"
+    return "front"  # Default to front (most classes are melee-capable)
+
+
+def _build_battlefield_summary(enemy, all_characters: list) -> str:
+    """Build a concise battlefield description for the enemy agent."""
+    monster_data = get_enemy_monster_data(enemy)
+
+    lines = [
+        f"You are {enemy.character_name} ({enemy.char_class}).",
+        f"HP: {enemy.hp_current}/{enemy.hp_max}, AC: {enemy.ac}, Speed: {enemy.speed}",
+        f"Tactics: {monster_data['tactics']}",
+    ]
+
+    # Actions
+    if monster_data["actions"]:
+        action_strs = []
+        for a in monster_data["actions"]:
+            s = f"  - {a['name']} ({a['type']}): +{a.get('attack_bonus', 3)} to hit, {a.get('damage', '1d6')} damage"
+            if a.get("special"):
+                s += f" [{a['special']}]"
+            action_strs.append(s)
+        lines.append("Your actions:\n" + "\n".join(action_strs))
+
+    if monster_data["traits"]:
+        lines.append(f"Traits: {', '.join(monster_data['traits'])}")
+
+    # Allies (other enemies alive)
+    allies = [c for c in all_characters if c.is_enemy and c.id != enemy.id and c.hp_current > 0]
+    if allies:
+        ally_strs = [f"  - {a.character_name}: HP {a.hp_current}/{a.hp_max}" for a in allies]
+        lines.append("Your allies:\n" + "\n".join(ally_strs))
+
+    # Opponents (PCs alive)
+    pcs = [c for c in all_characters if not c.is_npc and not c.is_enemy and c.hp_current > 0]
+    if pcs:
+        opp_strs = []
+        for pc in pcs:
+            pos = _classify_position(pc.char_class)
+            cond_str = f", conditions: {', '.join(pc.conditions)}" if pc.conditions else ""
+            opp_strs.append(
+                f"  - {pc.character_name} ({pc.race} {pc.char_class}): "
+                f"HP {pc.hp_current}/{pc.hp_max}, AC {pc.ac}, position: {pos}{cond_str}"
+            )
+        lines.append("Opponents:\n" + "\n".join(opp_strs))
+
+    return "\n".join(lines)
+
+
+ENEMY_AGENT_SYSTEM = """You are a combat AI controlling a single monster in a D&D 5e encounter.
+Choose the best tactical action based on the monster's personality and the battlefield.
+
+RULES:
+- Melee creatures should attack the closest opponent (front-line first).
+- Ranged creatures may target back-line opponents.
+- Unintelligent creatures (INT <= 5) attack the closest target, period.
+- Pack hunters focus on the same target as their allies.
+- Self-preserving creatures may flee when below 25% HP.
+- Use special abilities when they'd be most effective.
+
+Respond with ONLY valid JSON (no markdown):
+{"target": "character name", "action": "action name from your action list", "reasoning": "brief tactical note"}
+
+If you would flee instead of fight:
+{"target": null, "action": "flee", "reasoning": "why fleeing"}"""
+
+
+async def get_enemy_decision(enemy, all_characters: list) -> dict:
+    """Get an AI-powered tactical decision for an enemy.
+
+    Returns: {"target": str, "action": str, "action_data": dict}
+    Falls back to rule-based targeting if AI fails.
+    """
+    try:
+        if AI_BACKEND == "claude":
+            return await _ai_decision(enemy, all_characters)
+        else:
+            return _rule_decision(enemy, all_characters)
+    except Exception:
+        traceback.print_exc()
+        return _rule_decision(enemy, all_characters)
+
+
+async def _ai_decision(enemy, all_characters: list) -> dict:
+    """Call Claude Haiku for a tactical enemy decision."""
+    battlefield = _build_battlefield_summary(enemy, all_characters)
+
+    response = await _agent_client.messages.create(
+        model=ENEMY_AGENT_MODEL,
+        max_tokens=150,
+        system=ENEMY_AGENT_SYSTEM,
+        messages=[{"role": "user", "content": battlefield}],
+    )
+
+    raw = response.content[0].text.strip()
+    # Strip markdown code fences if present
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+    decision = json.loads(raw)
+    target_name = decision.get("target")
+    action_name = decision.get("action", "attack")
+
+    # Resolve action data from monster's action list
+    monster_data = get_enemy_monster_data(enemy)
+    action_data = _resolve_action(action_name, monster_data)
+
+    return {
+        "target": target_name,
+        "action": action_name,
+        "action_data": action_data,
+        "reasoning": decision.get("reasoning", ""),
+    }
+
+
+def _rule_decision(enemy, all_characters: list) -> dict:
+    """Deterministic rule-based targeting (fallback / Ollama mode).
+    Targets the closest enemy by class position, not lowest HP."""
+    monster_data = get_enemy_monster_data(enemy)
+    pcs = [c for c in all_characters if not c.is_npc and not c.is_enemy and c.hp_current > 0]
+
+    if not pcs:
+        return {"target": None, "action": "none", "action_data": {}}
+
+    int_score = enemy.int_score or 10
+
+    # Check if enemy should flee (self-preserving + below 25% HP)
+    if "flee" in monster_data["tactics"].lower() or "retreat" in monster_data["tactics"].lower():
+        if enemy.hp_current <= enemy.hp_max * 0.25:
+            return {"target": None, "action": "flee", "action_data": {}}
+
+    # Unintelligent (INT <= 5): attack closest (front-line first)
+    # Intelligent: can prioritize based on tactics
+    if int_score <= 5:
+        target = _pick_closest(pcs)
+    elif "pack" in monster_data["tactics"].lower():
+        target = _pick_pack_target(enemy, pcs, all_characters)
+    elif "weakest" in monster_data["tactics"].lower() or "caster" in monster_data["tactics"].lower():
+        target = _pick_weakest_armor(pcs)
+    else:
+        target = _pick_closest(pcs)
+
+    # Pick the best action
+    action_data = _pick_best_action(monster_data)
+
+    return {
+        "target": target.character_name,
+        "action": action_data.get("name", "Attack"),
+        "action_data": action_data,
+    }
+
+
+def _pick_closest(pcs: list):
+    """Pick the front-line PC (simulates proximity). Randomize among front-liners."""
+    import secrets
+    front = [c for c in pcs if _classify_position(c.char_class) == "front"]
+    if front:
+        return front[secrets.randbelow(len(front))]
+    # No front-liners — pick randomly
+    return pcs[secrets.randbelow(len(pcs))]
+
+
+def _pick_pack_target(enemy, pcs: list, all_characters: list):
+    """Pick the same target another allied enemy is already targeting (or closest)."""
+    # Look for PCs that other allies might be engaging (heuristic: PCs that took damage recently)
+    # For now, just pick the same target as a random ally would — front-line
+    return _pick_closest(pcs)
+
+
+def _pick_weakest_armor(pcs: list):
+    """Pick the PC with the lowest AC (casters, lightly armored)."""
+    return min(pcs, key=lambda c: c.ac)
+
+
+def _resolve_action(action_name: str, monster_data: dict) -> dict:
+    """Find the action data from the monster's action list."""
+    for action in monster_data.get("actions", []):
+        if action["name"].lower() == action_name.lower():
+            return action
+    # Default to first action or generic
+    if monster_data.get("actions"):
+        return monster_data["actions"][0]
+    return {
+        "name": "Attack",
+        "type": "melee",
+        "attack_bonus": monster_data.get("attack_bonus", 3),
+        "damage": monster_data.get("damage", "1d6+1"),
+        "reach": 5,
+    }
+
+
+def _pick_best_action(monster_data: dict) -> dict:
+    """Pick the best action for a rule-based enemy (defaults to first melee action)."""
+    actions = monster_data.get("actions", [])
+    # Prefer melee actions
+    melee = [a for a in actions if a.get("type") == "melee"]
+    if melee:
+        return melee[0]
+    if actions:
+        return actions[0]
+    return {
+        "name": "Attack",
+        "type": "melee",
+        "attack_bonus": monster_data.get("attack_bonus", 3),
+        "damage": monster_data.get("damage", "1d6+1"),
+        "reach": 5,
+    }

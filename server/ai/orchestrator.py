@@ -69,6 +69,18 @@ def build_system_prompt(campaign, game_state, characters, mode="play") -> str:
 
     prompt += f"\n\n## Party\n{party_summary}"
 
+    # Multiplayer note
+    pc_count = sum(1 for c in characters if not c.is_npc and not c.is_enemy)
+    if pc_count > 1:
+        prompt += (
+            "\n\n## Multiplayer Session"
+            f"\nThis is a multiplayer session with {pc_count} player characters."
+            "\nPlayer actions are prefixed with [CharacterName]: to identify who is acting."
+            "\nAddress the acting character by name in your narration."
+            "\nUse character names (not 'you') when describing actions so all players know who did what."
+            "\nIn combat, use the correct character name in tags: [PLAYER_ATTACK:CharName:Target]"
+        )
+
     if campaign.synopsis:
         prompt += f"\n\n## Story So Far\n{campaign.synopsis}"
 

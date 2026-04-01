@@ -13,3 +13,5 @@ AI_BACKEND = os.getenv("AI_BACKEND", "ollama")
 # Model names
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+# Lightweight model for enemy combat AI agents (fast + cheap)
+ENEMY_AGENT_MODEL = os.getenv("ENEMY_AGENT_MODEL", "claude-haiku-4-5-20251001")

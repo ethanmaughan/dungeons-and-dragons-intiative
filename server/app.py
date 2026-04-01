@@ -9,13 +9,18 @@ from server.routes.auth import router as auth_router
 from server.routes.campaigns import router as campaigns_router
 from server.routes.actions import router as actions_router
 from server.routes.characters import router as characters_router
+from server.routes.ws import router as ws_router
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Foray", version="0.2.0")
+    app = FastAPI(title="Foray", version="0.3.0")
 
     # Session middleware for auth cookies
     app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+    # WebSocket route must be registered BEFORE static files mount
+    # so the /ws/ path isn't caught by static file handler
+    app.include_router(ws_router)
 
     # Mount static files
     app.mount("/static", StaticFiles(directory="static"), name="static")

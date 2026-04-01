@@ -435,7 +435,10 @@ def _handle_xp(params: list, characters: list, state_changes: dict) -> str:
 
 def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state_changes: dict) -> str:
     """Handle [ENEMY_ATTACK:attacker_name:target_name].
-    Server handles EVERYTHING: lookup stats, roll attack, compare AC, roll damage, apply HP."""
+    Server handles EVERYTHING: lookup stats, roll attack, compare AC, roll damage, apply HP.
+    Uses actual monster stats (attack_bonus, damage) from stored monster data."""
+    from server.engine.combat import get_enemy_monster_data
+
     if len(params) < 2:
         return "[invalid enemy attack]"
 
@@ -450,19 +453,17 @@ def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state
     if not target:
         return f"[{target_name} not found]"
 
-    # Don't attack dead targets
     if target.hp_current <= 0:
         state_changes["player_down"] = True
         return f"\n{target.character_name} is already down!"
 
-    # Don't attack if attacker is dead
     if attacker.hp_current <= 0:
         return ""
 
-    # Get attacker's stats
-    str_mod = ability_modifier(attacker.str_score)
-    dex_mod = ability_modifier(attacker.dex_score)
-    attack_mod = max(str_mod, dex_mod) + attacker.proficiency_bonus
+    # Use actual monster stats instead of calculating from ability scores
+    monster_data = get_enemy_monster_data(attacker)
+    attack_mod = monster_data["attack_bonus"]
+    damage_notation = monster_data["damage"]
 
     # Roll attack
     atk = attack_roll(attack_mod)
@@ -481,11 +482,9 @@ def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state
     })
 
     if atk["critical"]:
-        # Critical hit — double damage dice
-        dmg_die = max(4, 6)  # Default d6 if unknown
-        dmg = roll(f"2d{dmg_die}")
-        dmg_mod = max(str_mod, dex_mod)
-        total_dmg = dmg["total"] + dmg_mod
+        crit_notation = _double_dice_notation(damage_notation)
+        dmg = roll(crit_notation)
+        total_dmg = dmg["total"]
 
         old_hp = target.hp_current
         target.hp_current = max(0, target.hp_current - total_dmg)
@@ -503,16 +502,13 @@ def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state
         return (
             f"\n{attacker.character_name} strikes at {target.character_name} — "
             f"**CRITICAL HIT!** (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac}) "
-            f"dealing {total_dmg} damage! ({target.character_name}: HP {old_hp} → {target.hp_current})"
+            f"dealing {total_dmg} damage! ({target.character_name}: HP {old_hp} -> {target.hp_current})"
             f"{down_msg}"
         )
 
     elif hit:
-        # Normal hit
-        dmg_die = max(4, 6)
-        dmg = roll(f"1d{dmg_die}")
-        dmg_mod = max(str_mod, dex_mod)
-        total_dmg = dmg["total"] + dmg_mod
+        dmg = roll(damage_notation)
+        total_dmg = dmg["total"]
 
         old_hp = target.hp_current
         target.hp_current = max(0, target.hp_current - total_dmg)
@@ -530,16 +526,27 @@ def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state
         return (
             f"\n{attacker.character_name} strikes at {target.character_name} — "
             f"Hit! (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac}) "
-            f"dealing {total_dmg} damage. ({target.character_name}: HP {old_hp} → {target.hp_current})"
+            f"dealing {total_dmg} damage. ({target.character_name}: HP {old_hp} -> {target.hp_current})"
             f"{down_msg}"
         )
 
     else:
-        # Miss
         return (
             f"\n{attacker.character_name} strikes at {target.character_name} — "
             f"Miss! (rolled {atk['rolls'][0]} + {atk['modifier']} = {atk['total']} vs AC {target.ac})"
         )
+
+
+def _double_dice_notation(notation: str) -> str:
+    """Double dice count for critical hits. '1d6+2' -> '2d6+2'."""
+    import re as _re
+    match = _re.match(r"(\d*)d(\d+)([+-]\d+)?", notation.strip().lower())
+    if not match:
+        return notation
+    count = int(match.group(1) or 1)
+    sides = match.group(2)
+    mod = match.group(3) or ""
+    return f"{count * 2}d{sides}{mod}"
 
 
 def _handle_player_attack(params: list, characters: list, dice_rolls: list, state_changes: dict) -> str:
@@ -629,8 +636,11 @@ def _handle_player_attack(params: list, characters: list, dice_rolls: list, stat
 
 
 def _handle_enemy_turn(params: list, characters: list, dice_rolls: list, state_changes: dict) -> str:
-    """Handle [ENEMY_TURN:enemy_name]. The server decides and executes the enemy's action.
-    For basic enemies, this picks the nearest/most logical target and attacks."""
+    """Handle [ENEMY_TURN:enemy_name]. Uses rule-based targeting from the enemy agent system.
+    Note: The combat orchestrator is the preferred path for enemy turns now. This is a fallback
+    for when the DM AI still emits these tags."""
+    from server.ai.enemy_agent import _rule_decision
+
     if not params:
         return ""
 
@@ -639,13 +649,11 @@ def _handle_enemy_turn(params: list, characters: list, dice_rolls: list, state_c
     if not enemy or enemy.hp_current <= 0:
         return ""
 
-    # Find the best target (player characters only, alive)
-    targets = [c for c in characters if not c.is_npc and not c.is_enemy and c.hp_current > 0]
-    if not targets:
-        return ""
+    # Use rule-based decision (proximity targeting, not lowest HP)
+    decision = _rule_decision(enemy, characters)
+    target_name = decision.get("target")
 
-    # Simple AI: attack the player with lowest HP
-    target = min(targets, key=lambda c: c.hp_current)
+    if not target_name or decision.get("action") == "flee":
+        return f"\n{enemy.character_name} turns and flees!"
 
-    # Execute the attack using the same logic as ENEMY_ATTACK
-    return _handle_enemy_attack([enemy_name, target.character_name], characters, dice_rolls, state_changes)
+    return _handle_enemy_attack([enemy_name, target_name], characters, dice_rolls, state_changes)

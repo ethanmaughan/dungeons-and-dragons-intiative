@@ -29,7 +29,8 @@ def get_monster_stats(name: str) -> dict | None:
 
 
 def create_enemy_characters(enemy_names: list, campaign_id: int, db) -> list:
-    """Create temporary Character rows for enemies in combat."""
+    """Create temporary Character rows for enemies in combat.
+    Stores full monster data in npc_personality for the enemy agent to read."""
     from server.db.models import Character
 
     enemies = []
@@ -43,6 +44,16 @@ def create_enemy_characters(enemy_names: list, campaign_id: int, db) -> list:
 
         stats = get_monster_stats(name)
         if stats:
+            # Store full monster data for enemy agent access
+            monster_data = {
+                "attack_bonus": stats.get("attack_bonus", 3),
+                "damage": stats.get("damage", "1d6+1"),
+                "cr": stats.get("cr", 0.25),
+                "actions": stats.get("actions", []),
+                "traits": stats.get("traits", []),
+                "tactics": stats.get("tactics", "Attacks the closest enemy."),
+            }
+
             enemy = Character(
                 campaign_id=campaign_id,
                 character_name=display_name,
@@ -61,6 +72,7 @@ def create_enemy_characters(enemy_names: list, campaign_id: int, db) -> list:
                 cha_score=stats.get("cha", 10),
                 is_npc=False,
                 is_enemy=True,
+                npc_personality=monster_data,
             )
         else:
             # Unknown monster — use generic stats
@@ -78,6 +90,14 @@ def create_enemy_characters(enemy_names: list, campaign_id: int, db) -> list:
                 con_score=12,
                 is_npc=False,
                 is_enemy=True,
+                npc_personality={
+                    "attack_bonus": 3,
+                    "damage": "1d6+1",
+                    "cr": 0.25,
+                    "actions": [{"name": "Attack", "type": "melee", "attack_bonus": 3, "damage": "1d6+1", "reach": 5}],
+                    "traits": [],
+                    "tactics": "Attacks the closest enemy.",
+                },
             )
 
         db.add(enemy)
@@ -102,20 +122,28 @@ def roll_all_initiative(characters: list) -> list[dict]:
             "is_enemy": c.is_enemy,
         })
 
-    # Sort by initiative (highest first)
+    # Sort by initiative (highest first), break ties by DEX
     initiative_order.sort(key=lambda x: x["initiative"], reverse=True)
     return initiative_order
 
 
 def start_combat(enemy_names: list, characters: list, game_state, campaign_id: int, db) -> dict:
     """Start combat: create enemies, roll initiative, update game state."""
+    # Guard: don't start combat if already in combat
+    if game_state.game_mode == "combat":
+        return {
+            "enemies": [],
+            "initiative_order": game_state.initiative_order or [],
+            "initiative_summary": "(Combat already in progress)",
+        }
+
     # Create enemy characters
     enemies = create_enemy_characters(enemy_names, campaign_id, db)
 
     # Combine all combatants (PCs + enemies)
     all_combatants = [c for c in characters if not c.is_enemy and c.hp_current > 0] + enemies
 
-    # Roll initiative
+    # Roll initiative ONCE
     initiative_order = roll_all_initiative(all_combatants)
 
     # Update game state
@@ -192,3 +220,16 @@ def all_enemies_dead(characters: list) -> bool:
     if not enemies:
         return True
     return all(c.hp_current <= 0 for c in enemies)
+
+
+def get_enemy_monster_data(enemy) -> dict:
+    """Extract monster combat data from an enemy Character's npc_personality field."""
+    data = enemy.npc_personality or {}
+    return {
+        "attack_bonus": data.get("attack_bonus", 3),
+        "damage": data.get("damage", "1d6+1"),
+        "cr": data.get("cr", 0.25),
+        "actions": data.get("actions", []),
+        "traits": data.get("traits", []),
+        "tactics": data.get("tactics", "Attacks the closest enemy."),
+    }
