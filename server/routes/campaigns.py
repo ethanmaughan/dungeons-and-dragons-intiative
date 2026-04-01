@@ -225,6 +225,8 @@ def join_by_code(
     db: DBSession = Depends(get_db),
 ):
     """Join a campaign using an invite code."""
+    from fastapi.responses import JSONResponse
+
     player = get_current_player(request, db)
     if not player:
         return RedirectResponse(url="/login", status_code=303)
@@ -234,14 +236,14 @@ def join_by_code(
     code = invite_code.strip().upper()
     campaign = db.query(Campaign).filter(Campaign.invite_code == code).first()
     if not campaign:
-        return RedirectResponse(url="/dashboard", status_code=303)
+        return JSONResponse({"error": "Invalid invite code."}, status_code=404)
 
-    # Verify the character belongs to this player and is unassigned
     character = db.query(Character).filter(Character.id == character_id).first()
-    if not character or character.player_id != player.id or character.campaign_id is not None:
-        return RedirectResponse(url="/dashboard", status_code=303)
+    if not character or character.player_id != player.id:
+        return JSONResponse({"error": "Character not found."}, status_code=400)
+    if character.campaign_id is not None:
+        return JSONResponse({"error": "Character is already assigned to a campaign."}, status_code=400)
 
-    # Check max players
     current_player_count = (
         db.query(Character)
         .filter(
@@ -252,16 +254,33 @@ def join_by_code(
         .count()
     )
     if current_player_count >= campaign.max_players:
-        return RedirectResponse(url="/dashboard", status_code=303)
+        return JSONResponse({"error": "Campaign is full."}, status_code=400)
 
-    # Don't join your own campaign through code
     if campaign.owner_id == player.id:
-        return RedirectResponse(url="/dashboard", status_code=303)
+        return JSONResponse({"error": "You own this campaign — assign directly from the dashboard."}, status_code=400)
 
     # Invite codes bypass visibility — always auto-join
     character.campaign_id = campaign.id
-    db.commit()
 
+    # Create a session if none exists
+    existing_session = (
+        db.query(GameSession)
+        .filter(GameSession.campaign_id == campaign.id, GameSession.status == "active")
+        .first()
+    )
+    if not existing_session:
+        from server.db.models import GameState
+        session = GameSession(campaign_id=campaign.id, session_number=1)
+        db.add(session)
+        db.flush()
+        game_state = GameState(
+            session_id=session.id,
+            game_mode="exploration",
+            environment_description="Your adventure begins...",
+        )
+        db.add(game_state)
+
+    db.commit()
     return RedirectResponse(url="/dashboard", status_code=303)
 
 

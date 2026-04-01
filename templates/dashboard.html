@@ -37,17 +37,17 @@
     <div id="join-code-form" class="parchment rounded-lg p-6 mb-10 hidden">
         <h2 class="text-xl gold-text mb-4">Join by Invite Code</h2>
         {% if unassigned_chars %}
-        <form action="/api/campaigns/join-by-code" method="post" class="flex items-end gap-4">
+        <form id="join-code-submit" class="flex items-end gap-4">
             <div>
                 <label class="block text-sm text-gray-400 mb-1">Invite Code</label>
-                <input type="text" name="invite_code" required maxlength="6"
+                <input type="text" name="invite_code" id="join-invite-code" required maxlength="6"
                        class="action-input rounded px-3 py-2 uppercase tracking-widest text-center font-mono text-lg w-36"
                        placeholder="A7K3XP"
                        style="letter-spacing: 0.2em;">
             </div>
             <div>
                 <label class="block text-sm text-gray-400 mb-1">Character</label>
-                <select name="character_id" class="action-input rounded px-3 py-2">
+                <select name="character_id" id="join-character-id" class="action-input rounded px-3 py-2">
                     {% for ch in unassigned_chars %}
                     <option value="{{ ch.id }}">{{ ch.character_name }} ({{ ch.race }} {{ ch.char_class }})</option>
                     {% endfor %}
@@ -55,6 +55,8 @@
             </div>
             <button type="submit" class="btn-action rounded px-6 py-2 font-bold">Join</button>
         </form>
+        <div id="join-code-error" class="bg-red-900/50 border border-red-700 rounded px-3 py-2 text-red-300 text-sm mt-3 hidden"></div>
+        <div id="join-code-success" class="bg-green-900/50 border border-green-700 rounded px-3 py-2 text-green-300 text-sm mt-3 hidden"></div>
         {% else %}
         <p class="text-gray-400 text-sm">You need an unassigned character to join a campaign. <a href="/character/create" class="gold-text hover:underline">Create one</a>.</p>
         {% endif %}
@@ -165,18 +167,28 @@
                 <div class="text-xs text-gray-500 mb-2">
                     {% if c.campaign %}
                         Campaign: {{ c.campaign.name }}
+                    {% elif c.creation_complete %}
+                        <span class="text-yellow-500">Unassigned</span>
+                        <div class="mt-1 space-y-1">
+                            {% if campaigns %}
+                            <form action="/api/characters/{{ c.id }}/assign" method="post" class="flex items-center gap-1">
+                                <select name="campaign_id" class="action-input rounded px-1 py-0.5 text-xs">
+                                    {% for camp in campaigns %}
+                                    <option value="{{ camp.id }}">{{ camp.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="gold-text hover:underline text-xs">Assign</button>
+                            </form>
+                            {% endif %}
+                            <form class="flex items-center gap-1 assign-by-code-form" data-character-id="{{ c.id }}">
+                                <input type="text" name="code" maxlength="6" required
+                                       class="action-input rounded px-1 py-0.5 text-xs w-20 uppercase font-mono"
+                                       placeholder="CODE">
+                                <button type="submit" class="gold-text hover:underline text-xs">Join by Code</button>
+                            </form>
+                        </div>
                     {% else %}
                         <span class="text-yellow-500">Unassigned</span>
-                        {% if campaigns %}
-                        — <form action="/api/characters/{{ c.id }}/assign" method="post" class="inline">
-                            <select name="campaign_id" class="action-input rounded px-1 py-0.5 text-xs">
-                                {% for camp in campaigns %}
-                                <option value="{{ camp.id }}">{{ camp.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <button type="submit" class="gold-text hover:underline text-xs ml-1">Assign</button>
-                        </form>
-                        {% endif %}
                     {% endif %}
                 </div>
                 {% if not c.creation_complete %}
@@ -340,6 +352,66 @@
             document.getElementById('delete-password').value = '';
             document.getElementById('delete-password').focus();
         }
+    });
+
+    // Join by invite code (top form)
+    const joinForm = document.getElementById('join-code-submit');
+    if (joinForm) {
+        joinForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const code = document.getElementById('join-invite-code').value.trim();
+            const charId = document.getElementById('join-character-id').value;
+            const errorEl = document.getElementById('join-code-error');
+            const successEl = document.getElementById('join-code-success');
+            errorEl.classList.add('hidden');
+            successEl.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('invite_code', code);
+            formData.append('character_id', charId);
+
+            const response = await fetch('/api/campaigns/join-by-code', {
+                method: 'POST',
+                body: formData,
+                redirect: 'follow',
+            });
+
+            if (response.redirected) {
+                window.location.reload();
+            } else if (!response.ok) {
+                const data = await response.json();
+                errorEl.textContent = data.error || 'Failed to join.';
+                errorEl.classList.remove('hidden');
+            } else {
+                window.location.reload();
+            }
+        });
+    }
+
+    // Join by code on character cards
+    document.querySelectorAll('.assign-by-code-form').forEach(form => {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const charId = this.dataset.characterId;
+            const code = this.querySelector('input[name="code"]').value.trim();
+
+            const formData = new FormData();
+            formData.append('invite_code', code);
+            formData.append('character_id', charId);
+
+            const response = await fetch('/api/campaigns/join-by-code', {
+                method: 'POST',
+                body: formData,
+                redirect: 'follow',
+            });
+
+            if (response.redirected || response.ok) {
+                window.location.reload();
+            } else {
+                const data = await response.json();
+                alert(data.error || 'Failed to join.');
+            }
+        });
     });
 </script>
 {% endblock %}
