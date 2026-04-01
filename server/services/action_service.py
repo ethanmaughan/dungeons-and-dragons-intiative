@@ -148,7 +148,37 @@ async def process_action(
                 None,
             )
             if current_entry and current_entry.get("is_enemy", False):
-                return {"error": "It's not your turn — enemies are acting"}
+                # Enemy's turn — try to resolve stuck enemy turns instead of rejecting
+                from server.ai.combat_orchestrator import resolve_enemy_phase
+                characters = session.campaign.characters
+                enemy_results = await resolve_enemy_phase(game_state, characters, db)
+                enemy_turn_results = []
+                for er in enemy_results:
+                    enemy_log = GameLog(
+                        session_id=session_id,
+                        turn_number=turn_number,
+                        actor=er["actor"],
+                        narration_text=er["narration"],
+                        dice_rolls=er["dice_rolls"],
+                        state_changes=er["state_changes"],
+                        game_mode="combat",
+                    )
+                    db.add(enemy_log)
+                    enemy_turn_results.append({
+                        "log": enemy_log,
+                        "narration": er["narration"],
+                        "actor": er["actor"],
+                    })
+                if enemy_turn_results:
+                    db.commit()
+                # Return the resolved enemy turns + updated state so the client unblocks
+                return {
+                    "log": None,
+                    "characters": _build_char_states(characters),
+                    "game_state": _build_gs_info(game_state),
+                    "combat_start": None,
+                    "enemy_turns": enemy_turn_results,
+                }
 
     # --- Character creation ---
     if is_character_creation:

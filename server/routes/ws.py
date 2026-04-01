@@ -137,16 +137,15 @@ async def websocket_session(ws: WebSocket, session_id: int):
 
                     log = result["log"]
 
-                    # Render narrative HTML for player's action
-                    html = templates.get_template("partials/narrative_entry.html").render(
-                        log=log,
-                    )
-
-                    # Broadcast player's narrative to ALL players
-                    await manager.broadcast(session_id, {
-                        "type": "narrative",
-                        "html": html,
-                    })
+                    # Broadcast player's narrative (if present — may be None for stuck-turn recovery)
+                    if log:
+                        html = templates.get_template("partials/narrative_entry.html").render(
+                            log=log,
+                        )
+                        await manager.broadcast(session_id, {
+                            "type": "narrative",
+                            "html": html,
+                        })
 
                     # Broadcast combat start as a SEPARATE event (if combat just triggered)
                     import asyncio
