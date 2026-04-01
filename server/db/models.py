@@ -34,6 +34,7 @@ class Campaign(Base):
     world_hour: Mapped[int] = mapped_column(Integer, default=8)
     visibility: Mapped[str] = mapped_column(String(20), default="open")
     max_players: Mapped[int] = mapped_column(Integer, default=4)
+    invite_code: Mapped[str | None] = mapped_column(String(10), unique=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )

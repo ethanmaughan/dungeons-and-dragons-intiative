@@ -20,6 +20,37 @@
         <a href="/browse" class="btn-secondary rounded px-6 py-3 font-bold">
             Browse Games
         </a>
+        <button onclick="document.getElementById('join-code-form').classList.toggle('hidden')"
+                class="btn-secondary rounded px-6 py-3 font-bold">
+            Join by Code
+        </button>
+    </div>
+
+    <!-- Join by Invite Code (hidden by default) -->
+    <div id="join-code-form" class="parchment rounded-lg p-6 mb-10 hidden">
+        <h2 class="text-xl gold-text mb-4">Join by Invite Code</h2>
+        {% if unassigned_chars %}
+        <form action="/api/campaigns/join-by-code" method="post" class="flex items-end gap-4">
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Invite Code</label>
+                <input type="text" name="invite_code" required maxlength="6"
+                       class="action-input rounded px-3 py-2 uppercase tracking-widest text-center font-mono text-lg w-36"
+                       placeholder="A7K3XP"
+                       style="letter-spacing: 0.2em;">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Character</label>
+                <select name="character_id" class="action-input rounded px-3 py-2">
+                    {% for ch in unassigned_chars %}
+                    <option value="{{ ch.id }}">{{ ch.character_name }} ({{ ch.race }} {{ ch.char_class }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn-action rounded px-6 py-2 font-bold">Join</button>
+        </form>
+        {% else %}
+        <p class="text-gray-400 text-sm">You need an unassigned character to join a campaign. <a href="/character/create" class="gold-text hover:underline">Create one</a>.</p>
+        {% endif %}
     </div>
 
     <!-- Inline Campaign Creation Form (hidden by default) -->
@@ -177,6 +208,15 @@
                         {% endif %}
                     </div>
                     <div class="flex items-center gap-3">
+                        <!-- Invite code (owner only) -->
+                        {% if campaign.owner_id == player.id and campaign.invite_code %}
+                        <div class="flex items-center gap-1">
+                            <span class="text-xs text-gray-500">Code:</span>
+                            <code class="text-xs font-mono gold-text bg-gray-800 px-1.5 py-0.5 rounded tracking-wider cursor-pointer"
+                                  onclick="navigator.clipboard.writeText('{{ campaign.invite_code }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='{{ campaign.invite_code }}', 1500)"
+                                  title="Click to copy">{{ campaign.invite_code }}</code>
+                        </div>
+                        {% endif %}
                         <!-- Visibility toggle (owner only) -->
                         {% if campaign.owner_id == player.id %}
                         <form action="/api/campaigns/{{ campaign.id }}/visibility" method="post" class="inline">

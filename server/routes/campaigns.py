@@ -1,3 +1,6 @@
+import secrets
+import string
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session as DBSession
@@ -8,6 +11,17 @@ from server.db.models import Campaign, Character, JoinRequest
 from server.db.models import Session as GameSession
 
 router = APIRouter()
+
+
+def _generate_invite_code(db: DBSession) -> str:
+    """Generate a unique 6-character invite code like 'A7K3XP'."""
+    alphabet = string.ascii_uppercase + string.digits
+    for _ in range(50):  # Retry limit
+        code = "".join(secrets.choice(alphabet) for _ in range(6))
+        existing = db.query(Campaign).filter(Campaign.invite_code == code).first()
+        if not existing:
+            return code
+    raise RuntimeError("Could not generate unique invite code")
 
 
 @router.post("/campaigns")
@@ -28,12 +42,14 @@ def create_campaign(
         visibility = "open"
     max_players = max(1, min(8, max_players))
 
+    invite_code = _generate_invite_code(db)
     campaign = Campaign(
         name=name,
         setting=setting,
         owner_id=player.id,
         visibility=visibility,
         max_players=max_players,
+        invite_code=invite_code,
     )
     db.add(campaign)
     db.commit()
@@ -183,5 +199,72 @@ def reject_join(
     if jr and jr.campaign_id == campaign_id and jr.status == "pending":
         jr.status = "rejected"
         db.commit()
+
+    return RedirectResponse(url="/dashboard", status_code=303)
+
+
+@router.post("/campaigns/join-by-code")
+def join_by_code(
+    request: Request,
+    invite_code: str = Form(...),
+    character_id: int = Form(...),
+    db: DBSession = Depends(get_db),
+):
+    """Join a campaign using an invite code."""
+    player = get_current_player(request, db)
+    if not player:
+        return RedirectResponse(url="/login", status_code=303)
+
+    code = invite_code.strip().upper()
+    campaign = db.query(Campaign).filter(Campaign.invite_code == code).first()
+    if not campaign:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    # Verify the character belongs to this player and is unassigned
+    character = db.query(Character).filter(Character.id == character_id).first()
+    if not character or character.player_id != player.id or character.campaign_id is not None:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    # Check max players
+    current_player_count = (
+        db.query(Character)
+        .filter(
+            Character.campaign_id == campaign.id,
+            Character.is_enemy == False,
+            Character.is_npc == False,
+        )
+        .count()
+    )
+    if current_player_count >= campaign.max_players:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    # Don't join your own campaign through code
+    if campaign.owner_id == player.id:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    # Invite codes bypass visibility — always auto-join
+    character.campaign_id = campaign.id
+    db.commit()
+
+    return RedirectResponse(url="/dashboard", status_code=303)
+
+
+@router.post("/campaigns/{campaign_id}/regenerate-code")
+def regenerate_invite_code(
+    request: Request,
+    campaign_id: int,
+    db: DBSession = Depends(get_db),
+):
+    """Regenerate the invite code for a campaign (owner only)."""
+    player = get_current_player(request, db)
+    if not player:
+        return RedirectResponse(url="/login", status_code=303)
+
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign or campaign.owner_id != player.id:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    campaign.invite_code = _generate_invite_code(db)
+    db.commit()
 
     return RedirectResponse(url="/dashboard", status_code=303)

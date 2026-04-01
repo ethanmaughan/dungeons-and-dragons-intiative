@@ -317,6 +317,9 @@
     let ws = null;
     let wsReconnectTimer = null;
     let actionPending = false;
+    let currentGameMode = '{{ game_state.game_mode if game_state else "exploration" }}';
+    let currentTurnCharId = {{ game_state.current_turn_character_id if game_state and game_state.current_turn_character_id else 'null' }};
+    let isMyTurn = true;  // Default to true for exploration
     const SESSION_ID = {{ session.id }};
     const MY_CHARACTER_ID = {{ my_character.id if my_character else 'null' }};
 
@@ -392,12 +395,11 @@
             case 'narrative':
                 appendNarrative(data.html);
                 actionPending = false;
-                updateSendButton();
                 break;
 
             case 'state_update':
                 updateCharacterStates(data.characters);
-                updateGameState(data.game_state);
+                updateGameState(data.game_state);  // This calls checkIfMyTurn + updateSendButton
                 break;
 
             case 'player_joined':
@@ -411,7 +413,7 @@
                 break;
 
             case 'error':
-                showNotification(`Error: ${data.message}`, true);
+                showNotification(data.message, true);
                 actionPending = false;
                 updateSendButton();
                 break;
@@ -427,6 +429,12 @@
         const text = input.value.trim();
         if (!text || !ws || ws.readyState !== WebSocket.OPEN || actionPending) return;
 
+        // Turn lock check (client-side, server also enforces)
+        if (currentGameMode === 'combat' && !isMyTurn) {
+            showNotification("It's not your turn", true);
+            return;
+        }
+
         actionPending = true;
         updateSendButton();
 
@@ -441,8 +449,54 @@
 
     function updateSendButton() {
         const btn = document.getElementById('send-btn');
-        btn.disabled = actionPending;
-        btn.textContent = actionPending ? 'Waiting...' : 'Send';
+        const input = document.getElementById('action-input');
+
+        if (actionPending) {
+            btn.disabled = true;
+            btn.textContent = 'Waiting...';
+            input.disabled = true;
+        } else if (currentGameMode === 'combat' && !isMyTurn) {
+            btn.disabled = true;
+            btn.textContent = 'Not Your Turn';
+            input.disabled = true;
+            input.placeholder = "Waiting for other players or enemies...";
+        } else {
+            btn.disabled = false;
+            btn.textContent = 'Send';
+            input.disabled = false;
+            if (currentGameMode === 'combat') {
+                input.placeholder = "It's your turn! Describe your action...";
+            } else {
+                input.placeholder = "What do you do?";
+            }
+        }
+    }
+
+    function checkIfMyTurn(gs) {
+        if (!gs || gs.game_mode !== 'combat') {
+            isMyTurn = true;
+            return;
+        }
+        if (!MY_CHARACTER_ID) {
+            isMyTurn = true;  // Campaign owner without character can always act
+            return;
+        }
+        // It's my turn if the current turn character is my character
+        // OR if the current turn is any PC (flexible: any player can act on a PC turn)
+        const currentEntry = (gs.initiative_order || []).find(
+            e => e.character_id === gs.current_turn_character_id
+        );
+        if (!currentEntry) {
+            isMyTurn = true;
+            return;
+        }
+        // If it's an enemy's turn, no one can act
+        if (currentEntry.is_enemy) {
+            isMyTurn = false;
+            return;
+        }
+        // It's a PC's turn — only that PC's player can act
+        isMyTurn = (gs.current_turn_character_id === MY_CHARACTER_ID);
     }
 
     // --- UI Updates ---
@@ -502,6 +556,12 @@
 
     function updateGameState(gs) {
         if (!gs) return;
+
+        // Update turn state
+        currentGameMode = gs.game_mode;
+        currentTurnCharId = gs.current_turn_character_id;
+        checkIfMyTurn(gs);
+        updateSendButton();
 
         // Update mode labels
         const modeLabel = document.getElementById('game-mode-label');
