@@ -450,10 +450,11 @@
         const text = input.value.trim();
         if (!text || !ws || ws.readyState !== WebSocket.OPEN || actionPending) return;
 
-        // Turn lock check (client-side, server also enforces)
-        if (currentGameMode === 'combat' && !isMyTurn) {
-            showNotification("It's not your turn", true);
-            return;
+        // Slash commands always go through, even when not your turn
+        const isSlashCmd = text.startsWith('/');
+        // Turn lock: warn (but don't block) when not your turn
+        if (currentGameMode === 'combat' && !isMyTurn && !isSlashCmd) {
+            // Allow sending — server lets DM answer questions without consuming the turn
         }
 
         actionPending = true;
@@ -476,16 +477,17 @@
             btn.disabled = true;
             btn.textContent = 'Waiting...';
             input.disabled = true;
-        } else if (currentGameMode === 'combat' && !isMyTurn) {
-            btn.disabled = true;
-            btn.textContent = 'Not Your Turn';
-            input.disabled = true;
-            input.placeholder = "Waiting for other players or enemies...";
         } else {
             btn.disabled = false;
             btn.textContent = 'Send';
             input.disabled = false;
-            if (currentGameMode === 'combat') {
+            if (currentGameMode === 'combat' && !isMyTurn) {
+                // Find whose turn it is
+                const gs = {initiative_order: window._lastInitOrder, current_turn_character_id: currentTurnCharId};
+                const entry = (gs.initiative_order || []).find(e => e.character_id === gs.current_turn_character_id);
+                const turnName = entry ? entry.character_name : 'someone else';
+                input.placeholder = `${turnName}'s turn — you can still ask questions or use /rewind`;
+            } else if (currentGameMode === 'combat') {
                 input.placeholder = "It's your turn! Describe your action...";
             } else {
                 input.placeholder = "What do you do?";
@@ -613,6 +615,7 @@
         // Update turn state
         currentGameMode = gs.game_mode;
         currentTurnCharId = gs.current_turn_character_id;
+        window._lastInitOrder = gs.initiative_order || [];
         checkIfMyTurn(gs);
         updateSendButton();
 

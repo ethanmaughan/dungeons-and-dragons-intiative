@@ -180,10 +180,9 @@ async def process_action(
                     "combat_start": None,
                     "enemy_turns": enemy_turn_results,
                 }
-            else:
-                # It's another PC's turn — reject this action
-                pc_name = current_entry["character_name"] if current_entry else "another player"
-                return {"error": f"It's {pc_name}'s turn"}
+            # else: it's another PC's turn. Let the message through to the DM
+            # (for questions/conversation) but player_took_combat_action will be
+            # False so the turn won't advance.
 
     # --- Slash commands: /endcombat, /rewind ---
     if (
@@ -288,7 +287,14 @@ async def process_action(
         state_changes = result["state_changes"]
 
     # Detect if the player took a mechanical combat action (attack, spell, dodge, etc.)
-    player_took_combat_action = bool(
+    # Only counts if it's actually this player's turn — prevents out-of-turn actions
+    # from advancing the initiative.
+    is_my_turn = (
+        acting_character
+        and game_state
+        and game_state.current_turn_character_id == acting_character.id
+    )
+    player_took_combat_action = is_my_turn and bool(
         any(r.get("type") == "player_attack" for r in dice_rolls)
         or state_changes.get("spells_cast")
         or state_changes.get("combat_action")
