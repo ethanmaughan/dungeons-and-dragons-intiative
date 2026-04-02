@@ -114,6 +114,23 @@
                             {% endfor %}
                             {% endif %}
                         </div>
+                        <!-- Death Saves (shown when at 0 HP) -->
+                        <div class="mt-1 {% if c.hp_current > 0 %}hidden{% endif %}" id="death-saves-{{ c.id }}">
+                            <div class="flex items-center gap-2 text-xs">
+                                <span class="text-green-500">&#10003;</span>
+                                <span class="flex gap-0.5" id="ds-success-{{ c.id }}">
+                                    <span class="w-2.5 h-2.5 rounded-full border border-green-600 inline-block"></span>
+                                    <span class="w-2.5 h-2.5 rounded-full border border-green-600 inline-block"></span>
+                                    <span class="w-2.5 h-2.5 rounded-full border border-green-600 inline-block"></span>
+                                </span>
+                                <span class="text-red-500">&#10007;</span>
+                                <span class="flex gap-0.5" id="ds-failure-{{ c.id }}">
+                                    <span class="w-2.5 h-2.5 rounded-full border border-red-600 inline-block"></span>
+                                    <span class="w-2.5 h-2.5 rounded-full border border-red-600 inline-block"></span>
+                                    <span class="w-2.5 h-2.5 rounded-full border border-red-600 inline-block"></span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
                     {% endif %}
                 {% endfor %}
@@ -554,6 +571,38 @@
                 condEl.innerHTML = c.conditions.map(cond =>
                     `<span class="bg-red-900/50 text-red-300 text-xs px-1.5 py-0.5 rounded">${cond}</span>`
                 ).join('');
+            }
+
+            // Update death saves
+            const dsEl = document.getElementById(`death-saves-${c.id}`);
+            if (dsEl) {
+                if (c.hp_current <= 0 && c.death_saves) {
+                    dsEl.classList.remove('hidden');
+                    const succEl = document.getElementById(`ds-success-${c.id}`);
+                    const failEl = document.getElementById(`ds-failure-${c.id}`);
+                    if (succEl) {
+                        const dots = succEl.querySelectorAll('span');
+                        dots.forEach((el, i) => {
+                            el.className = `w-2.5 h-2.5 rounded-full inline-block border ${
+                                i < c.death_saves.successes
+                                    ? 'bg-green-500 border-green-500'
+                                    : 'border-green-600'
+                            }`;
+                        });
+                    }
+                    if (failEl) {
+                        const dots = failEl.querySelectorAll('span');
+                        dots.forEach((el, i) => {
+                            el.className = `w-2.5 h-2.5 rounded-full inline-block border ${
+                                i < c.death_saves.failures
+                                    ? 'bg-red-500 border-red-500'
+                                    : 'border-red-600'
+                            }`;
+                        });
+                    }
+                } else {
+                    dsEl.classList.add('hidden');
+                }
             }
         }
     }

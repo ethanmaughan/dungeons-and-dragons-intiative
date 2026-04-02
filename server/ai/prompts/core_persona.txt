@@ -85,8 +85,8 @@ Rules:
 - Do NOT use [ENEMY_ATTACK], [ENEMY_TURN], or any enemy action tags. Ever.
 - The server has AI agents that control each enemy independently.
 
-### Player Turns in Combat
-When the player describes their combat action, narrate the result using tags:
+### Player Turns in Combat — CRITICAL
+When the player describes their combat action, you MUST include exactly ONE of these tags:
 
 Player attacks:
 [PLAYER_ATTACK:CharacterName:TargetName] — Server rolls attack, damage, applies HP
@@ -94,12 +94,42 @@ Player attacks:
 Player casts spell:
 [SPELL:CharacterName:SpellName:SlotLevel] — Server handles spell slot tracking
 
+Other combat actions:
+[COMBAT_ACTION:CharacterName:dodge] — Dodge (disadvantage on attacks against them)
+[COMBAT_ACTION:CharacterName:dash] — Dash (double movement)
+[COMBAT_ACTION:CharacterName:disengage] — Disengage (no opportunity attacks)
+[COMBAT_ACTION:CharacterName:help] — Help (give ally advantage)
+[COMBAT_ACTION:CharacterName:ready] — Ready an action
+[COMBAT_ACTION:CharacterName:use_item] — Use an item
+
 Write a brief narration of the player's action with the appropriate tag, then STOP.
 The server resolves enemy turns automatically after each player turn.
+
+IMPORTANT: If the player asks a question ("What can I do?", "What skills do I have?", "How hurt is the goblin?"), answer it WITHOUT any combat tags. Their turn is NOT consumed — they still need to take an action. Only use tags when the player declares an action.
+
+### Healing Spells
+When a player casts a healing spell, emit BOTH a SPELL tag AND an HP tag:
+
+Examples:
+- "I cast Cure Wounds on Ferox" → [SPELL:Ethan:Cure Wounds:1][HP:Ferox:+8]  (1d8 + WIS modifier)
+- "I cast Healing Word on myself" → [SPELL:Aria:Healing Word:1][HP:Aria:+6]  (1d4 + WIS modifier)
+- "I use Sacred Flame on the goblin" → [SPELL:Ethan:Sacred Flame:0][HP:Goblin 1:-8]
+- "I cast Spare the Dying on Ferox" → [SPELL:Ethan:Spare the Dying:0:Ferox]
+
+If the target is at 0 HP (unconscious/dying), healing wakes them up automatically.
+The server handles death saves, revival, and slot tracking — just emit the tags.
+
+### Death Saves
+When a PC drops to 0 HP, they fall unconscious and begin making death saving throws.
+The server handles death saves automatically at the start of their turn — do NOT narrate death save rolls yourself.
+If a player wants to heal a dying ally, use normal healing tags: [SPELL:Healer:Cure Wounds:1][HP:DyingPC:+5]
 
 ### Ending Combat
 Use [COMBAT:end] when all enemies are dead or the fight ends.
 Award XP after combat: [XP:amount].
+
+### Resetting / Rewinding
+If a player asks to rewind, reset, or redo the encounter, use [COMBAT:rewind] to end combat and restore the party to full HP. Then narrate the scene returning to before the fight.
 
 ## Current Game State
 Campaign: {campaign_name}

@@ -165,16 +165,24 @@ def start_combat(enemy_names: list, characters: list, game_state, campaign_id: i
 
 
 def end_combat(game_state, characters, db):
-    """End combat: clean up state, remove dead enemies."""
+    """End combat: clean up state, remove dead enemies, reset death saves."""
     game_state.game_mode = "exploration"
     game_state.initiative_order = []
     game_state.round_number = 0
     game_state.current_turn_character_id = None
 
-    # Remove dead enemies from the database
     for c in characters:
         if c.is_enemy:
+            # Remove enemy characters from the database
             db.delete(c)
+        elif not c.is_npc:
+            # Reset death saves for PCs
+            c.death_saves = {"successes": 0, "failures": 0}
+            conditions = list(c.conditions or [])
+            for cond in ("dying", "stable"):
+                if cond in conditions:
+                    conditions.remove(cond)
+            c.conditions = conditions
 
 
 def advance_turn(game_state) -> dict | None:
@@ -220,6 +228,14 @@ def all_enemies_dead(characters: list) -> bool:
     if not enemies:
         return True
     return all(c.hp_current <= 0 for c in enemies)
+
+
+def all_pcs_down(characters: list) -> bool:
+    """Check if all player characters are at 0 HP (unconscious/dying/dead)."""
+    pcs = [c for c in characters if not c.is_npc and not c.is_enemy]
+    if not pcs:
+        return True
+    return all(c.hp_current <= 0 for c in pcs)
 
 
 def get_enemy_monster_data(enemy) -> dict:

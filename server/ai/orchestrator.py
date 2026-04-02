@@ -46,6 +46,16 @@ def build_system_prompt(campaign, game_state, characters, mode="play") -> str:
                 f"STR {c.str_score} DEX {c.dex_score} CON {c.con_score} "
                 f"INT {c.int_score} WIS {c.wis_score} CHA {c.cha_score}"
             )
+            # Death save status
+            if c.hp_current <= 0:
+                conditions = c.conditions or []
+                if "dead" in conditions:
+                    line += " [DEAD]"
+                elif "stable" in conditions:
+                    line += " [STABLE — unconscious]"
+                else:
+                    saves = c.death_saves or {"successes": 0, "failures": 0}
+                    line += f" [DYING — saves: {saves['successes']} successes, {saves['failures']} failures]"
             if c.spell_slots_current:
                 slots_str = ", ".join(
                     f"L{k}: {v}/{c.spell_slots.get(k, '?')}"

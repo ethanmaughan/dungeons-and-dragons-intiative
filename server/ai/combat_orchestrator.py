@@ -11,10 +11,12 @@ from server.ai.enemy_agent import get_enemy_decision
 from server.engine.combat import (
     advance_turn,
     all_enemies_dead,
+    all_pcs_down,
     end_combat,
     get_enemy_monster_data,
     is_enemy_turn,
 )
+from server.engine.death_saves import _set_dying
 from server.engine.dice import attack_roll, roll, ability_modifier
 from server.engine.action_processor import find_character
 
@@ -36,6 +38,17 @@ async def resolve_enemy_phase(game_state, characters: list, db) -> list[dict]:
         if result:
             results.append(result)
         turns_resolved += 1
+
+        # All PCs down? End combat — the party has fallen.
+        if all_pcs_down(characters):
+            end_combat(game_state, characters, db)
+            results.append({
+                "narration": "\n--- The party has fallen! ---\n",
+                "dice_rolls": [],
+                "state_changes": {"combat_ended": True, "tpk": True},
+                "actor": "system",
+            })
+            return results
 
     # Walk forward through initiative, resolving enemies, stopping at next PC
     while turns_resolved < max_turns:
@@ -74,7 +87,101 @@ async def resolve_enemy_phase(game_state, characters: list, db) -> list[dict]:
             })
             break
 
+        # All PCs down? End combat — the party has fallen.
+        if all_pcs_down(characters):
+            end_combat(game_state, characters, db)
+            results.append({
+                "narration": "\n--- The party has fallen! ---\n",
+                "dice_rolls": [],
+                "state_changes": {"combat_ended": True, "tpk": True},
+                "actor": "system",
+            })
+            break
+
         turns_resolved += 1
+
+    return results
+
+
+async def resolve_dying_pc_turns(game_state, characters: list, db) -> list[dict]:
+    """Auto-resolve turns for dying/stable/dead PCs at the current turn position.
+
+    After enemy phase resolves and current_turn points to a PC, if that PC is
+    at 0 HP, auto-roll their death save (or skip if stable/dead) and advance.
+    Loops through consecutive down PCs, resolving any enemies in between.
+    """
+    from server.engine.death_saves import is_dying, is_dead, is_stable, roll_death_save
+
+    results = []
+    max_iterations = len(game_state.initiative_order or [])
+
+    for _ in range(max_iterations):
+        current_id = game_state.current_turn_character_id
+        pc = next((c for c in characters if c.id == current_id), None)
+
+        if not pc or pc.is_enemy:
+            break  # Not a PC — stop
+
+        if pc.hp_current > 0:
+            break  # PC is conscious — they can act normally
+
+        if is_dead(pc):
+            results.append({
+                "narration": f"\n{pc.character_name}'s body lies motionless...",
+                "dice_rolls": [],
+                "state_changes": {"death_save_skip": pc.character_name},
+                "actor": pc.character_name,
+            })
+            next_entry = advance_turn(game_state)
+            if next_entry and next_entry.get("is_enemy", False):
+                enemy_results = await resolve_enemy_phase(game_state, characters, db)
+                results.extend(enemy_results)
+            continue
+
+        if is_stable(pc):
+            results.append({
+                "narration": f"\n{pc.character_name} is unconscious but stable.",
+                "dice_rolls": [],
+                "state_changes": {"death_save_skip": pc.character_name},
+                "actor": pc.character_name,
+            })
+            next_entry = advance_turn(game_state)
+            if next_entry and next_entry.get("is_enemy", False):
+                enemy_results = await resolve_enemy_phase(game_state, characters, db)
+                results.extend(enemy_results)
+            continue
+
+        # PC is dying — roll death save
+        save_result = roll_death_save(pc)
+        results.append({
+            "narration": save_result["narration"],
+            "dice_rolls": [{
+                "type": "death_save",
+                "roll": save_result["roll"],
+                "outcome": save_result["outcome"],
+            }],
+            "state_changes": {"death_save": {
+                "character": pc.character_name,
+                "outcome": save_result["outcome"],
+                "successes": save_result["successes"],
+                "failures": save_result["failures"],
+            }},
+            "actor": pc.character_name,
+        })
+
+        if save_result["outcome"] == "nat20":
+            # PC woke up with 1 HP — they get to act this turn
+            break
+
+        # Any other outcome: turn consumed, advance
+        next_entry = advance_turn(game_state)
+        if next_entry and next_entry.get("is_enemy", False):
+            enemy_results = await resolve_enemy_phase(game_state, characters, db)
+            results.extend(enemy_results)
+
+        # If combat ended during enemy resolution, stop
+        if game_state.game_mode != "combat":
+            break
 
     return results
 
@@ -179,9 +286,10 @@ def _execute_enemy_action(enemy, decision: dict, characters: list) -> dict:
         })
 
         down_msg = ""
-        if target.hp_current <= 0:
+        if target.hp_current <= 0 and old_hp > 0 and not target.is_enemy:
+            _set_dying(target)
             state_changes["player_down"] = True
-            down_msg = f"\n\n** {target.character_name} falls unconscious! **"
+            down_msg = f"\n\n** {target.character_name} falls unconscious and is dying! **"
 
         narration = (
             f"\n{enemy.character_name} uses {action_label} on {target.character_name} — "
@@ -203,9 +311,10 @@ def _execute_enemy_action(enemy, decision: dict, characters: list) -> dict:
         })
 
         down_msg = ""
-        if target.hp_current <= 0:
+        if target.hp_current <= 0 and old_hp > 0 and not target.is_enemy:
+            _set_dying(target)
             state_changes["player_down"] = True
-            down_msg = f"\n\n** {target.character_name} falls unconscious! **"
+            down_msg = f"\n\n** {target.character_name} falls unconscious and is dying! **"
 
         narration = (
             f"\n{enemy.character_name} uses {action_label} on {target.character_name} — "
