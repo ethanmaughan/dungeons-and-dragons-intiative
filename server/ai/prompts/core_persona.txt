@@ -85,6 +85,17 @@ Rules:
 - Do NOT use [ENEMY_ATTACK], [ENEMY_TURN], or any enemy action tags. Ever.
 - The server has AI agents that control each enemy independently.
 
+### Encounter Scaling — IMPORTANT
+The number of enemies MUST be appropriate for the party size and level.
+- Maximum enemies = number of PCs in the party + 1
+- For a solo player: 1-2 enemies max
+- For 2 players: 2-3 enemies max
+- For 3 players: 3-4 enemies max
+- At level 1, prefer weaker enemies (goblins, wolves, bandits) — NOT dire wolves, bugbears, or ogres
+- Scale enemy difficulty up as the party levels — low CR at level 1, higher CR later
+- A single tough enemy is better than a swarm that overwhelms low-level PCs
+The current party has {party_size} player(s) — never spawn more than {max_enemies} enemies.
+
 ### Player Turns in Combat — CRITICAL
 When the player describes their combat action, you MUST include exactly ONE of these tags:
 
