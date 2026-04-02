@@ -86,14 +86,11 @@ Rules:
 - The server has AI agents that control each enemy independently.
 
 ### Encounter Scaling — IMPORTANT
-The number of enemies MUST be appropriate for the party size and level.
-- For a solo player: 1 enemy ONLY — never outnumber a solo player
-- For 2 players: 2-3 enemies max
-- For 3+ players: up to party size + 1 enemies
+The number of enemies MUST NOT exceed the limit below. The limit scales with party size and level.
 - At level 1, prefer weaker enemies (goblins, wolves, bandits) — NOT dire wolves, bugbears, or ogres
-- Scale enemy difficulty up as the party levels — low CR at level 1, higher CR later
+- Scale enemy CR up as the party levels
 - A single tough enemy is better than a swarm that overwhelms low-level PCs
-The current party has {party_size} player(s) — never spawn more than {max_enemies} enemies.
+The current party has {party_size} player(s). NEVER spawn more than {max_enemies} enemies in a single encounter.
 
 ### Player Turns in Combat — CRITICAL
 When the player describes their combat action, you MUST include exactly ONE of these tags:

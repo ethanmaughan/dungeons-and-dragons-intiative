@@ -70,14 +70,17 @@ def build_system_prompt(campaign, game_state, characters, mode="play") -> str:
 
     party_summary = "\n".join(party_lines) if party_lines else "No characters yet."
 
-    pc_count = sum(1 for c in characters if not c.is_npc and not c.is_enemy)
+    pcs = [c for c in characters if not c.is_npc and not c.is_enemy]
+    pc_count = len(pcs)
+    avg_level = sum(c.level for c in pcs) / max(pc_count, 1)
+    max_enemies = max(1, pc_count + int(avg_level // 2))
     prompt = CORE_PERSONA.format(
         campaign_name=campaign.name,
         setting=campaign.setting or "A classic fantasy world.",
         game_mode=game_state.game_mode if game_state else "exploration",
         environment=game_state.environment_description if game_state else "Unknown",
         party_size=pc_count,
-        max_enemies=pc_count if pc_count <= 1 else pc_count + 1,
+        max_enemies=max_enemies,
     )
 
     prompt += f"\n\n## Party\n{party_summary}"
