@@ -6,8 +6,16 @@
 {% endif %}
 
 {% if log.narration_text %}
+{% set is_enemy_turn = (not log.action_text) and log.game_mode == 'combat' and log.actor not in ('system', 'Player', 'Game Master') and log.actor != '' %}
+{% if is_enemy_turn %}
+<div class="narrative-text pl-4 border-l-2 border-red-800">
+    <span class="text-red-400 text-sm font-bold">{{ log.actor }}</span>
+    <div class="mt-1 whitespace-pre-wrap text-red-200/80">{{ log.narration_text }}</div>
+</div>
+{% else %}
 <div class="dm-narration narrative-text pl-4 border-l-2 border-yellow-800">
     <span class="gold-text text-sm font-bold">Game Master</span>
     <div class="mt-1 whitespace-pre-wrap">{{ log.narration_text }}</div>
 </div>
+{% endif %}
 {% endif %}
