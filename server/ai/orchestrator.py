@@ -77,7 +77,7 @@ def build_system_prompt(campaign, game_state, characters, mode="play") -> str:
         game_mode=game_state.game_mode if game_state else "exploration",
         environment=game_state.environment_description if game_state else "Unknown",
         party_size=pc_count,
-        max_enemies=pc_count + 1,
+        max_enemies=pc_count if pc_count <= 1 else pc_count + 1,
     )
 
     prompt += f"\n\n## Party\n{party_summary}"
