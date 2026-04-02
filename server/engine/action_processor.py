@@ -71,6 +71,8 @@ def process_dm_response(raw_text: str, characters: list, game_state, db) -> dict
                 replacement = _handle_rest(params, characters, state_changes)
             elif tag_type == "XP":
                 replacement = _handle_xp(params, characters, state_changes)
+            elif tag_type == "COMBAT_ACTION":
+                replacement = _handle_combat_action(params, characters, state_changes)
             elif tag_type == "ENEMY_ATTACK":
                 replacement = _handle_enemy_attack(params, characters, dice_rolls, state_changes)
             elif tag_type == "PLAYER_ATTACK":
@@ -218,6 +220,10 @@ def _handle_roll(params: list, characters: list, dice_rolls: list) -> str:
 
 def _handle_hp(params: list, characters: list, state_changes: dict) -> str:
     """Handle [HP:TARGET:CHANGE] tags."""
+    from server.engine.death_saves import (
+        apply_damage_at_zero_hp, apply_healing_at_zero_hp, _set_dying,
+    )
+
     if len(params) < 2:
         return ""
 
@@ -229,6 +235,31 @@ def _handle_hp(params: list, characters: list, state_changes: dict) -> str:
         return ""
 
     old_hp = target.hp_current
+    was_at_zero = target.hp_current <= 0
+
+    # Healing a dying/stable character — wake them up
+    if was_at_zero and change > 0 and not target.is_enemy:
+        result = apply_healing_at_zero_hp(target, change)
+        state_changes.setdefault("hp_changes", []).append({
+            "target": target.character_name,
+            "old": old_hp,
+            "new": target.hp_current,
+            "change": change,
+            "revived": True,
+        })
+        return result["narration"]
+
+    # Damage to a dying character — automatic death save failure
+    if was_at_zero and change < 0 and not target.is_enemy:
+        result = apply_damage_at_zero_hp(target, is_critical=False)
+        state_changes.setdefault("hp_changes", []).append({
+            "target": target.character_name,
+            "old": 0, "new": 0, "change": 0,
+            "death_save_failure": True,
+        })
+        return result["narration"]
+
+    # Normal HP change
     target.hp_current = max(0, min(target.hp_max, target.hp_current + change))
 
     state_changes.setdefault("hp_changes", []).append({
@@ -237,6 +268,12 @@ def _handle_hp(params: list, characters: list, state_changes: dict) -> str:
         "new": target.hp_current,
         "change": change,
     })
+
+    # Just dropped to 0 — start dying
+    if target.hp_current <= 0 and old_hp > 0 and not target.is_enemy:
+        _set_dying(target)
+        down_msg = f"\n** {target.character_name} falls unconscious and is dying! **"
+        return f"({target.character_name}: {abs(change)} damage, HP {old_hp} → {target.hp_current}){down_msg}"
 
     if change < 0:
         return f"({target.character_name}: {abs(change)} damage, HP {old_hp} → {target.hp_current})"
@@ -327,6 +364,18 @@ def _handle_combat(params: list, characters: list, game_state, state_changes: di
         state_changes["combat_ended"] = True
         return "\n--- COMBAT ENDS ---\n"
 
+    elif action == "rewind":
+        end_combat(game_state, characters, db)
+        # Restore all PCs to full HP and clear conditions
+        for c in characters:
+            if not c.is_npc and not c.is_enemy:
+                c.hp_current = c.hp_max
+                c.conditions = []
+                c.death_saves = {"successes": 0, "failures": 0}
+        state_changes["combat_ended"] = True
+        state_changes["rewind"] = True
+        return "\n--- Combat rewound — returning to before the encounter ---\n"
+
     return ""
 
 
@@ -348,6 +397,22 @@ def _handle_spell(params: list, characters: list, state_changes: dict) -> str:
         state_changes.setdefault("spells_cast", []).append({
             "caster": caster.character_name, "spell": spell_name, "level": 0,
         })
+
+        # Spare the Dying: stabilize a dying target
+        if spell_name.lower() == "spare the dying":
+            target_name = params[3] if len(params) > 3 else None
+            if target_name:
+                target = find_character(characters, target_name)
+                if target and target.hp_current <= 0 and not target.is_enemy:
+                    target.death_saves = {"successes": 3, "failures": (target.death_saves or {}).get("failures", 0)}
+                    conditions = list(target.conditions or [])
+                    if "dying" in conditions:
+                        conditions.remove("dying")
+                    if "stable" not in conditions:
+                        conditions.append("stable")
+                    target.conditions = conditions
+                    return f"({caster.character_name} casts Spare the Dying on {target.character_name} — stabilized!)"
+
         return f"({caster.character_name} casts {spell_name})"
 
     # Check spell slots
@@ -433,6 +498,35 @@ def _handle_xp(params: list, characters: list, state_changes: dict) -> str:
     return result_text
 
 
+def _handle_combat_action(params: list, characters: list, state_changes: dict) -> str:
+    """Handle [COMBAT_ACTION:CharName:action_type] for non-attack combat actions."""
+    if len(params) < 2:
+        return ""
+
+    char_name = params[0]
+    action_type = params[1].lower()
+
+    char = find_character(characters, char_name)
+    if not char:
+        return f"[{char_name} not found]"
+
+    state_changes["combat_action"] = {
+        "character": char.character_name,
+        "action": action_type,
+    }
+
+    action_descriptions = {
+        "dodge": f"({char.character_name} takes the Dodge action — attacks against them have disadvantage until next turn)",
+        "dash": f"({char.character_name} takes the Dash action, doubling movement speed this turn)",
+        "disengage": f"({char.character_name} takes the Disengage action, moving without provoking opportunity attacks)",
+        "help": f"({char.character_name} takes the Help action, granting an ally advantage on their next check)",
+        "ready": f"({char.character_name} readies an action, waiting for a trigger)",
+        "use_item": f"({char.character_name} uses an item)",
+    }
+
+    return action_descriptions.get(action_type, f"({char.character_name} takes the {action_type.title()} action)")
+
+
 def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state_changes: dict) -> str:
     """Handle [ENEMY_ATTACK:attacker_name:target_name].
     Server handles EVERYTHING: lookup stats, roll attack, compare AC, roll damage, apply HP.
@@ -453,9 +547,12 @@ def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state
     if not target:
         return f"[{target_name} not found]"
 
-    if target.hp_current <= 0:
+    if target.hp_current <= 0 and not target.is_enemy:
+        # Target is already down — melee hit on unconscious = auto-crit = 2 death save failures
+        from server.engine.death_saves import apply_damage_at_zero_hp
+        result = apply_damage_at_zero_hp(target, is_critical=True)
         state_changes["player_down"] = True
-        return f"\n{target.character_name} is already down!"
+        return result["narration"]
 
     if attacker.hp_current <= 0:
         return ""
@@ -495,9 +592,11 @@ def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state
         })
 
         down_msg = ""
-        if target.hp_current <= 0:
+        if target.hp_current <= 0 and old_hp > 0 and not target.is_enemy:
+            from server.engine.death_saves import _set_dying
+            _set_dying(target)
             state_changes["player_down"] = True
-            down_msg = f"\n\n** {target.character_name} falls unconscious! **"
+            down_msg = f"\n\n** {target.character_name} falls unconscious and is dying! **"
 
         return (
             f"\n{attacker.character_name} strikes at {target.character_name} — "
@@ -519,9 +618,11 @@ def _handle_enemy_attack(params: list, characters: list, dice_rolls: list, state
         })
 
         down_msg = ""
-        if target.hp_current <= 0:
+        if target.hp_current <= 0 and old_hp > 0 and not target.is_enemy:
+            from server.engine.death_saves import _set_dying
+            _set_dying(target)
             state_changes["player_down"] = True
-            down_msg = f"\n\n** {target.character_name} falls unconscious! **"
+            down_msg = f"\n\n** {target.character_name} falls unconscious and is dying! **"
 
         return (
             f"\n{attacker.character_name} strikes at {target.character_name} — "

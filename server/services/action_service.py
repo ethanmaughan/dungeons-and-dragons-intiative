@@ -40,6 +40,7 @@ def _build_char_states(characters):
             "hp_max": c.hp_max,
             "ac": c.ac,
             "conditions": c.conditions or [],
+            "death_saves": c.death_saves or {"successes": 0, "failures": 0},
             "is_enemy": c.is_enemy,
             "is_npc": c.is_npc,
             "player_id": c.player_id,
@@ -179,6 +180,52 @@ async def process_action(
                     "combat_start": None,
                     "enemy_turns": enemy_turn_results,
                 }
+            else:
+                # It's another PC's turn — reject this action
+                pc_name = current_entry["character_name"] if current_entry else "another player"
+                return {"error": f"It's {pc_name}'s turn"}
+
+    # --- Slash commands: /endcombat, /rewind ---
+    if (
+        was_already_in_combat
+        and action_text.lower().strip() in ("/endcombat", "/rewind")
+    ):
+        from server.engine.combat import end_combat
+        is_rewind = action_text.lower().strip() == "/rewind"
+        end_combat(game_state, characters, db)
+        if is_rewind:
+            for c in characters:
+                if not c.is_npc and not c.is_enemy:
+                    c.hp_current = c.hp_max
+                    c.conditions = []
+                    c.death_saves = {"successes": 0, "failures": 0}
+        narration = (
+            "--- Combat rewound — returning to before the encounter ---"
+            if is_rewind else "--- Combat ended ---"
+        )
+        state_changes = {"combat_ended": True}
+        if is_rewind:
+            state_changes["rewind"] = True
+        log_entry = GameLog(
+            session_id=session_id,
+            character_id=acting_character.id if acting_character else None,
+            turn_number=turn_number,
+            actor=acting_character.character_name if acting_character else "Player",
+            action_text=action_text,
+            narration_text=narration,
+            dice_rolls=[],
+            state_changes=state_changes,
+            game_mode="exploration",
+        )
+        db.add(log_entry)
+        db.commit()
+        return {
+            "log": log_entry,
+            "characters": _build_char_states(session.campaign.characters),
+            "game_state": _build_gs_info(game_state),
+            "combat_start": None,
+            "enemy_turns": [],
+        }
 
     # --- Character creation ---
     if is_character_creation:
@@ -239,6 +286,13 @@ async def process_action(
         narration = _clean_combat_noise(narration)
         dice_rolls = result["dice_rolls"]
         state_changes = result["state_changes"]
+
+    # Detect if the player took a mechanical combat action (attack, spell, dodge, etc.)
+    player_took_combat_action = bool(
+        any(r.get("type") == "player_attack" for r in dice_rolls)
+        or state_changes.get("spells_cast")
+        or state_changes.get("combat_action")
+    )
 
     # Save the DM's narrative to game log
     actor_name = acting_character.character_name if acting_character else "Player"
@@ -301,8 +355,8 @@ async def process_action(
             # Combat JUST started. Resolve enemies only if they go first.
             first = (game_state.initiative_order or [{}])[0]
             should_resolve = first.get("is_enemy", False)
-        elif was_already_in_combat and not state_changes.get("combat_ended"):
-            # Normal turn: player just acted, resolve enemies until next PC
+        elif was_already_in_combat and not state_changes.get("combat_ended") and player_took_combat_action:
+            # Player took a combat action — advance their turn and resolve enemies until next PC
             should_resolve = True
 
         if should_resolve:
@@ -326,6 +380,32 @@ async def process_action(
                 })
             if enemy_turn_results:
                 db.commit()
+
+    # ==========================================================
+    # PHASE 5 — Resolve dying PC turns (death saves, skip dead/stable)
+    # ==========================================================
+    if game_state and game_state.game_mode == "combat" and not state_changes.get("combat_ended"):
+        from server.ai.combat_orchestrator import resolve_dying_pc_turns
+        characters = session.campaign.characters
+        dying_results = await resolve_dying_pc_turns(game_state, characters, db)
+        for dr in dying_results:
+            dying_log = GameLog(
+                session_id=session_id,
+                turn_number=turn_number,
+                actor=dr["actor"],
+                narration_text=dr["narration"],
+                dice_rolls=dr["dice_rolls"],
+                state_changes=dr["state_changes"],
+                game_mode="combat",
+            )
+            db.add(dying_log)
+            enemy_turn_results.append({
+                "log": dying_log,
+                "narration": dr["narration"],
+                "actor": dr["actor"],
+            })
+        if dying_results:
+            db.commit()
 
     return {
         "log": log_entry,
