@@ -358,6 +358,7 @@
     const SESSION_ID = {{ session.id }};
     const MY_CHARACTER_ID = {{ my_character.id if my_character else 'null' }};
 
+<<<<<<< HEAD
     // --- Combat Map ---
     let combatPositions = {};
     let mapCanvas = null;
@@ -543,6 +544,32 @@
         tokenImages = {};
         combatPositions = {};
         document.getElementById('speed-tracker').classList.add('hidden');
+
+    // Character-aware combat suggestions
+    {% if my_character %}
+    const MY_CLASS = '{{ my_character.char_class }}'.toLowerCase();
+    const COMBAT_SUGGESTIONS = {
+        'fighter':  ['Attack with your weapon!', 'Use Second Wind to heal!', 'Throw a javelin!', 'Shield bash and strike!'],
+        'paladin':  ['Smite the enemy!', 'Cast a healing spell!', 'Attack with divine fury!', 'Lay on Hands to heal an ally!'],
+        'wizard':   ['Cast a spell!', 'Fire Bolt the nearest enemy!', 'Cast Shield to protect yourself!', 'Use Magic Missile!'],
+        'sorcerer': ['Unleash a spell!', 'Fire Bolt!', 'Cast Chaos Bolt!', 'Use your metamagic!'],
+        'warlock':  ['Eldritch Blast!', 'Cast Hex on an enemy!', 'Use your patron\'s power!', 'Curse and blast!'],
+        'cleric':   ['Heal an ally!', 'Cast Sacred Flame!', 'Use your divine power!', 'Shield of Faith on the fighter!'],
+        'rogue':    ['Sneak attack!', 'Hide and strike from the shadows!', 'Use Cunning Action to disengage!', 'Aim for the weak spot!'],
+        'ranger':   ['Fire an arrow!', 'Cast Hunter\'s Mark!', 'Attack with your longbow!', 'Track and strike!'],
+        'barbarian':['RAGE and attack!', 'Reckless Attack!', 'Charge the biggest enemy!', 'Smash with your greataxe!'],
+        'bard':     ['Inspire an ally!', 'Cast Vicious Mockery!', 'Use your bardic magic!', 'Sing a battle hymn!'],
+        'monk':     ['Flurry of Blows!', 'Use your ki!', 'Strike with your fists!', 'Deflect the next attack!'],
+        'druid':    ['Wild Shape!', 'Cast a nature spell!', 'Entangle the enemies!', 'Heal with Goodberry!'],
+    };
+    const MY_SUGGESTIONS = COMBAT_SUGGESTIONS[MY_CLASS] || ['Attack!', 'Cast a spell!', 'Use an ability!', 'Defend yourself!'];
+    {% else %}
+    const MY_CLASS = '';
+    const MY_SUGGESTIONS = ['What do you do?'];
+    {% endif %}
+
+    function getRandomSuggestion() {
+        return MY_SUGGESTIONS[Math.floor(Math.random() * MY_SUGGESTIONS.length)];
     }
 
     // --- Sidebar ---
@@ -694,17 +721,18 @@
             btn.textContent = 'Send';
             input.disabled = false;
             if (currentGameMode === 'combat') {
-                // Show whose turn it is as a hint, but don't lock
                 const currentEntry = (currentInitOrder || []).find(
                     e => e.character_id === currentTurnCharId
                 );
                 if (currentEntry && !currentEntry.is_enemy && currentEntry.character_id === MY_CHARACTER_ID) {
-                    input.placeholder = "It's your turn! Describe your action...";
+                    input.placeholder = getRandomSuggestion();
                 } else if (currentEntry && !currentEntry.is_enemy) {
                     input.placeholder = "Another player's turn — or type to act...";
                 } else {
-                    input.placeholder = "What do you do?";
+                    input.placeholder = getRandomSuggestion();
                 }
+            } else if (currentGameMode === 'character_creation') {
+                input.placeholder = "Say hello to begin character creation...";
             } else {
                 input.placeholder = "What do you do?";
             }

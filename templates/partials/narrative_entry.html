@@ -15,7 +15,7 @@
 {# Autonomous narration (enemy turns, death saves) — show the actor's name #}
 <div class="narrative-text pl-4 border-l-2 border-red-800">
     <span class="text-red-400 text-sm font-bold">{{ log.actor }}</span>
-    <div class="mt-1 whitespace-pre-wrap">{{ log.narration_text }}</div>
+    <div class="mt-1 whitespace-pre-wrap text-red-200/80">{{ log.narration_text }}</div>
 </div>
 {% else %}
 {# DM response to a player action #}
