@@ -37,5 +37,13 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def on_startup():
         create_tables()
+        # Auto-import story JSON files so they're always available
+        from server.db.database import SessionLocal
+        from server.services.story_service import import_all_stories
+        db = SessionLocal()
+        try:
+            import_all_stories(db)
+        finally:
+            db.close()
 
     return app

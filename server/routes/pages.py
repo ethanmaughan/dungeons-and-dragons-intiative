@@ -73,6 +73,10 @@ def dashboard(request: Request, db: DBSession = Depends(get_db)):
             .all()
         )
 
+    # Available stories for campaign creation
+    from server.db.models import StoryTemplate
+    available_stories = db.query(StoryTemplate).all()
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "player": player,
@@ -81,6 +85,7 @@ def dashboard(request: Request, db: DBSession = Depends(get_db)):
         "active_sessions": active_sessions,
         "unassigned_chars": unassigned_chars,
         "pending_requests": pending_requests,
+        "stories": available_stories,
     })
 
 

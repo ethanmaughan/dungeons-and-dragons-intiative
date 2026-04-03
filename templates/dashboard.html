@@ -69,6 +69,15 @@
                           class="action-input w-full rounded px-3 py-2"
                           placeholder="Describe the world">A classic fantasy world of swords, sorcery, and ancient ruins.</textarea>
             </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Story</label>
+                <select name="story_slug" class="action-input w-full rounded px-3 py-2">
+                    <option value="">No story (freeform adventure)</option>
+                    {% for story in stories %}
+                    <option value="{{ story.slug }}">{{ story.title }} — {{ story.recommended_players }} players, Level {{ story.recommended_level }}+</option>
+                    {% endfor %}
+                </select>
+            </div>
             <div class="flex gap-6">
                 <div>
                     <label class="block text-sm text-gray-400 mb-1">Visibility</label>

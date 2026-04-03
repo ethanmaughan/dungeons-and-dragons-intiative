@@ -31,9 +31,10 @@ def create_campaign(
     setting: str = Form("A classic fantasy world of swords and sorcery."),
     visibility: str = Form("open"),
     max_players: int = Form(4),
+    story_slug: str = Form(""),
     db: DBSession = Depends(get_db),
 ):
-    """Create a new campaign."""
+    """Create a new campaign, optionally with an authored story."""
     player = get_current_player(request, db)
     if not player:
         return RedirectResponse(url="/login", status_code=303)
@@ -53,6 +54,14 @@ def create_campaign(
     )
     db.add(campaign)
     db.commit()
+
+    # Assign story if selected
+    if story_slug and story_slug.strip():
+        from server.services.story_service import assign_story
+        try:
+            assign_story(campaign.id, story_slug.strip(), db)
+        except ValueError:
+            pass  # Story not found or already assigned — campaign still created
 
     return RedirectResponse(url="/dashboard", status_code=303)
 
