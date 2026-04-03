@@ -17,7 +17,7 @@ else:
     import ollama
 
 
-def build_system_prompt(campaign, game_state, characters, mode="play", chapter_context: str | None = None) -> str:
+def build_system_prompt(campaign, game_state, characters, mode="play", chapter_context: str | None = None, rolling_summary: str | None = None) -> str:
     """Assemble the system prompt based on game mode."""
 
     if mode == "character_creation":
@@ -101,6 +101,9 @@ def build_system_prompt(campaign, game_state, characters, mode="play", chapter_c
     elif campaign.synopsis:
         prompt += f"\n\n## Story So Far\n{campaign.synopsis}"
 
+    if rolling_summary:
+        prompt += f"\n\n## Earlier This Session\n{rolling_summary}"
+
     return prompt
 
 
@@ -151,11 +154,13 @@ async def process_player_action(
     recent_logs,
     mode: str = "play",
     chapter_context: str | None = None,
+    rolling_summary: str | None = None,
 ) -> str:
     """Process a player action and return the DM's narration."""
     try:
         system_prompt = build_system_prompt(
-            campaign, game_state, characters, mode=mode, chapter_context=chapter_context,
+            campaign, game_state, characters, mode=mode,
+            chapter_context=chapter_context, rolling_summary=rolling_summary,
         )
         messages = build_messages(system_prompt, action, recent_logs)
 

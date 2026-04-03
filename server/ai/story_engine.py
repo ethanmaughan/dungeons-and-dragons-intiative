@@ -280,3 +280,58 @@ def advance_chapter(campaign_story_id: int, chapter_summary: str, db) -> int | N
     db.commit()
 
     return next_chapter.chapter_number
+
+
+# ---- Session Summarizer ----
+
+SUMMARY_INTERVAL = 20  # Summarize every N turns
+
+
+async def maybe_summarize(game_state, turn_number: int, recent_logs, db):
+    """Every SUMMARY_INTERVAL turns, summarize recent narration and append to rolling_summary.
+
+    This preserves context that would otherwise be lost when older turns fall
+    out of the 20-turn message window. The rolling summary is injected into
+    the DM prompt so the AI remembers what happened earlier in the session.
+    """
+    if turn_number % SUMMARY_INTERVAL != 0 or turn_number == 0:
+        return
+
+    # Gather narration from the last SUMMARY_INTERVAL turns
+    narrations = [
+        log.narration_text for log in recent_logs
+        if log.narration_text and log.narration_text.strip()
+    ]
+    if not narrations:
+        return
+
+    combined = "\n\n".join(narrations[-SUMMARY_INTERVAL:])
+
+    if AI_BACKEND == "claude":
+        try:
+            response = await _story_client.messages.create(
+                model=MILESTONE_MODEL,
+                max_tokens=200,
+                system=(
+                    "You are a campaign chronicler. Summarize the recent events of this "
+                    "D&D session in 2-3 concise sentences. Focus on: what the players did, "
+                    "key discoveries, NPC interactions, and combat outcomes. "
+                    "Write in past tense, third person."
+                ),
+                messages=[{"role": "user", "content": combined}],
+            )
+            segment_summary = response.content[0].text.strip()
+        except Exception:
+            traceback.print_exc()
+            # Fallback: just note the turn range
+            segment_summary = f"[Turns {turn_number - SUMMARY_INTERVAL + 1}-{turn_number}: events occurred]"
+    else:
+        segment_summary = f"[Turns {turn_number - SUMMARY_INTERVAL + 1}-{turn_number}: events occurred]"
+
+    # Append to rolling summary
+    existing = game_state.rolling_summary or ""
+    if existing:
+        game_state.rolling_summary = existing + "\n" + segment_summary
+    else:
+        game_state.rolling_summary = segment_summary
+    db.flush()

@@ -397,6 +397,7 @@ async def process_action(
         recent_logs=recent_logs,
         mode="character_creation" if is_character_creation else "play",
         chapter_context=_chapter_context,
+        rolling_summary=game_state.rolling_summary if game_state else None,
     )
 
     # ==========================================================
@@ -478,6 +479,13 @@ async def process_action(
                         turn_number,
                         db,
                     )
+
+    # ==========================================================
+    # ROLLING SUMMARY — preserve context beyond the 20-turn window
+    # ==========================================================
+    if game_state and not is_character_creation:
+        from server.ai.story_engine import maybe_summarize
+        await maybe_summarize(game_state, turn_number, recent_logs, db)
 
     # ==========================================================
     # PHASE 3 — Combat start (separate event)
