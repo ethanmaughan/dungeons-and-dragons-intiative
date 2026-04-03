@@ -91,7 +91,8 @@
                 {% for c in characters %}
                     {% if not c.is_npc and not c.is_enemy %}
                     <div class="mb-3" id="party-member-{{ c.id }}">
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between cursor-pointer hover:bg-gray-800/50 rounded px-1 -mx-1 py-0.5"
+                             onclick="toggleCharSheet({{ c.id }})">
                             <div class="flex items-center gap-2">
                                 <span class="online-dot disconnected" id="online-dot-{{ c.player_id }}"></span>
                                 <span class="gold-text text-sm font-bold">{{ c.character_name }}</span>
@@ -159,16 +160,23 @@
                 </div>
             </div>
 
-            <!-- Character Sheet (my character only) -->
-            {% if my_character %}
-            {% set c = my_character %}
-            <div class="border-t border-gray-700 pt-4 mb-6">
-                <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Character Sheet</h3>
+            <!-- Character Sheets (all party members, toggled on click) -->
+            {% for c in characters %}
+            {% if not c.is_npc and not c.is_enemy %}
+            <div class="border-t border-gray-700 pt-4 mb-6 hidden" id="char-sheet-{{ c.id }}">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs text-gray-500 uppercase tracking-wider">
+                        {{ c.character_name }}'s Sheet
+                        {% if my_character and c.id == my_character.id %}
+                        <span class="text-blue-400">(You)</span>
+                        {% endif %}
+                    </h3>
+                    <button onclick="toggleCharSheet({{ c.id }})" class="text-xs text-gray-500 hover:text-gray-300">Close</button>
+                </div>
 
-                <!-- Combat Stats -->
                 <div class="grid grid-cols-3 gap-2 mb-3">
                     <div class="text-center parchment rounded p-1.5">
-                        <div class="text-lg font-bold text-red-400" id="sheet-hp">{{ c.hp_current }}/{{ c.hp_max }}</div>
+                        <div class="text-lg font-bold text-red-400" id="sheet-hp-{{ c.id }}">{{ c.hp_current }}/{{ c.hp_max }}</div>
                         <div class="text-xs text-gray-500">HP</div>
                     </div>
                     <div class="text-center parchment rounded p-1.5">
@@ -181,78 +189,58 @@
                     </div>
                 </div>
 
-                <!-- Ability Scores -->
                 <div class="grid grid-cols-6 gap-1 mb-3">
                     {% set abilities = [
-                        ("STR", c.str_score),
-                        ("DEX", c.dex_score),
-                        ("CON", c.con_score),
-                        ("INT", c.int_score),
-                        ("WIS", c.wis_score),
-                        ("CHA", c.cha_score)
+                        ("STR", c.str_score), ("DEX", c.dex_score), ("CON", c.con_score),
+                        ("INT", c.int_score), ("WIS", c.wis_score), ("CHA", c.cha_score)
                     ] %}
                     {% for name, score in abilities %}
                     <div class="text-center">
                         <div class="text-xs text-gray-500">{{ name }}</div>
                         <div class="text-sm font-bold">{{ score }}</div>
-                        <div class="text-xs gold-text">
-                            {% set mod = (score - 10) // 2 %}{% if mod >= 0 %}+{% endif %}{{ mod }}
-                        </div>
+                        <div class="text-xs gold-text">{% set mod = (score - 10) // 2 %}{% if mod >= 0 %}+{% endif %}{{ mod }}</div>
                     </div>
                     {% endfor %}
                 </div>
 
-                <!-- Spells -->
                 {% if c.spells %}
                 <div class="mb-3">
                     <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Spells</h4>
                     <div class="space-y-0.5">
-                        {% for spell in c.spells %}
-                        <div class="text-xs text-purple-300">{{ spell }}</div>
-                        {% endfor %}
+                        {% for spell in c.spells %}<div class="text-xs text-purple-300">{{ spell }}</div>{% endfor %}
                     </div>
                 </div>
                 {% endif %}
 
-                <!-- Inventory -->
                 <div class="mb-3">
                     <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Inventory</h4>
                     {% if c.inventory %}
                     <div class="space-y-0.5">
-                        {% for item in c.inventory %}
-                        <div class="text-xs text-gray-300">{{ item }}</div>
-                        {% endfor %}
+                        {% for item in c.inventory %}<div class="text-xs text-gray-300">{{ item }}</div>{% endfor %}
                     </div>
                     {% else %}
                     <div class="text-xs text-gray-600 italic">Empty</div>
                     {% endif %}
                 </div>
 
-                <!-- Features -->
                 {% if c.features %}
                 <div class="mb-3">
                     <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Features</h4>
                     <div class="space-y-0.5">
-                        {% for feat in c.features %}
-                        <div class="text-xs text-gray-300">{{ feat }}</div>
-                        {% endfor %}
+                        {% for feat in c.features %}<div class="text-xs text-gray-300">{{ feat }}</div>{% endfor %}
                     </div>
                 </div>
                 {% endif %}
 
-                <!-- Conditions -->
                 {% if c.conditions %}
                 <div class="mb-3">
                     <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Conditions</h4>
                     <div class="flex flex-wrap gap-1">
-                        {% for cond in c.conditions %}
-                        <span class="bg-red-900/50 text-red-300 text-xs px-1.5 py-0.5 rounded">{{ cond }}</span>
-                        {% endfor %}
+                        {% for cond in c.conditions %}<span class="bg-red-900/50 text-red-300 text-xs px-1.5 py-0.5 rounded">{{ cond }}</span>{% endfor %}
                     </div>
                 </div>
                 {% endif %}
 
-                <!-- Spell Slots -->
                 {% if c.spell_slots %}
                 <div class="mb-3">
                     <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-1">Spell Slots</h4>
@@ -265,6 +253,7 @@
                 {% endif %}
             </div>
             {% endif %}
+            {% endfor %}
 
             <!-- Game Info -->
             <div class="border-t border-gray-700 pt-4">
@@ -561,11 +550,9 @@
                 headerHp.textContent = `${c.hp_current}/${c.hp_max} HP`;
             }
 
-            // Update sheet HP if it's my character
-            if (c.id === MY_CHARACTER_ID) {
-                const sheetHp = document.getElementById('sheet-hp');
-                if (sheetHp) sheetHp.textContent = `${c.hp_current}/${c.hp_max}`;
-            }
+            // Update sheet HP for any visible character sheet
+            const sheetHp = document.getElementById(`sheet-hp-${c.id}`);
+            if (sheetHp) sheetHp.textContent = `${c.hp_current}/${c.hp_max}`;
 
             // Update conditions
             const condEl = document.getElementById(`conditions-${c.id}`);
@@ -679,6 +666,22 @@
         // Update count
         const countEl = document.getElementById('online-count');
         if (countEl) countEl.textContent = `${playerIds.length} online`;
+    }
+
+    function toggleCharSheet(charId) {
+        const sheet = document.getElementById(`char-sheet-${charId}`);
+        if (!sheet) return;
+        // If this sheet is already visible, hide it
+        if (!sheet.classList.contains('hidden')) {
+            sheet.classList.add('hidden');
+            return;
+        }
+        // Hide all other sheets first
+        document.querySelectorAll('[id^="char-sheet-"]').forEach(el => el.classList.add('hidden'));
+        // Show the clicked one
+        sheet.classList.remove('hidden');
+        // Scroll it into view
+        sheet.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     function showCombatStart(data) {

@@ -1,0 +1,153 @@
+{
+  "slug": "tutorial",
+  "title": "Welcome to Foray",
+  "author": "Foray Team",
+  "synopsis": "A guided introduction to Foray's gameplay. Learn to explore, interact with NPCs, use your abilities, and survive combat in a safe training environment.",
+  "setting": "The Training Grounds of Oakhollow, a peaceful village where new adventurers learn their craft before setting out into the wider world.",
+  "recommended_level": 1,
+  "recommended_players": "1-4",
+  "chapters": [
+    {
+      "chapter_number": 1,
+      "title": "Finding Your Feet",
+      "summary": "The player arrives at the Oakhollow Training Grounds and learns the basics: talking to NPCs, exploring the environment, and checking their character sheet.",
+      "setting_description": "Oakhollow is a sun-dappled village built around a massive ancient oak tree. The training grounds are a fenced practice yard behind the village hall, with straw dummies, archery targets, and a small obstacle course. The village is warm and welcoming.",
+      "dm_guidance": "This is a TUTORIAL chapter. Be warm, encouraging, and patient. Guide the player step by step. After describing the scene, ALWAYS suggest what they can try next. Mention the training master Greta by name early so the player knows to talk to her. When the player interacts with Greta, have her explain that they should check their character sheet (spells, abilities, inventory) to see what they can do. When they interact with the training dummy, transition naturally into a practice fight. Keep it light and encouraging — this is their first time. Tone: friendly, safe, tutorial.",
+      "opening_narration": "Welcome to Oakhollow! The morning sun bathes the village training grounds in warm golden light. A sturdy woman in leather armor stands near a row of straw practice dummies, waving you over with a broad grin. 'Fresh adventurer, eh? I'm Greta, the training master. Come on over — let's see what you're made of!'",
+      "transition_narration": "Greta claps you on the shoulder with a proud grin. 'Not bad at all! You've got the basics down. Now let's see how you handle a real encounter — nothing too dangerous, I promise.' She leads you toward the edge of the village where the road meets the forest.",
+      "objectives": [
+        {
+          "key": "talk_to_greta",
+          "description": "Introduce yourself to Greta the training master",
+          "hint": "Greta is waving you over near the practice dummies",
+          "required": true,
+          "sort_order": 1,
+          "detection_keywords": ["greta", "training", "hello", "introduce", "hi", "name"],
+          "detection_prompt": "Has the player had a conversation with Greta the training master?"
+        },
+        {
+          "key": "check_abilities",
+          "description": "Ask about your abilities or check your character sheet",
+          "hint": "Try asking Greta what you can do, or look at your spells and inventory in the sidebar",
+          "required": true,
+          "sort_order": 2,
+          "detection_keywords": ["abilities", "spells", "skills", "what can i do", "character sheet", "inventory", "stats"],
+          "detection_prompt": "Has the player asked about their abilities, spells, or character capabilities?"
+        },
+        {
+          "key": "practice_attack",
+          "description": "Practice attacking a training dummy",
+          "hint": "Try swinging your weapon at one of the straw dummies",
+          "required": true,
+          "sort_order": 3,
+          "detection_keywords": ["attack", "hit", "strike", "dummy", "swing", "practice", "fight"],
+          "detection_prompt": "Has the player attempted to attack or practice combat on a training dummy?"
+        }
+      ],
+      "npcs": [
+        {
+          "name": "Greta",
+          "role": "training_master",
+          "personality": "Warm, encouraging, patient. She has trained hundreds of adventurers and genuinely enjoys helping beginners. She gives clear, practical advice without being condescending. She laughs easily and tells bad jokes.",
+          "appearance": "A broad-shouldered human woman in her forties with short red hair, laugh lines, and calloused hands. She wears well-worn leather armor and carries a wooden practice sword at her hip.",
+          "dialogue_hooks": [
+            {
+              "topic": "abilities",
+              "response_guidance": "She asks what class the player is, then explains their key abilities in simple terms. For fighters: 'You hit things really hard. Try swinging at that dummy!' For clerics: 'You can heal AND fight! And you have spells — check your character sheet.' For wizards: 'You have spells that can change the tide of battle. Take a look at what you know.' Always encourage them to look at their character sheet in the sidebar."
+            },
+            {
+              "topic": "combat",
+              "response_guidance": "She explains: 'Combat in Foray is simple — describe what you want to do. Say something like I attack the dummy or I cast Fire Bolt at the target. The game handles the dice rolls and mechanics for you.'"
+            },
+            {
+              "topic": "the village",
+              "response_guidance": "She describes Oakhollow as a safe place where adventurers prepare before heading out. The real adventures are beyond the village — but first, master the basics here."
+            }
+          ],
+          "knowledge": [
+            "She has trained hundreds of adventurers over twenty years",
+            "The training grounds have dummies for melee practice and targets for ranged attacks",
+            "She believes everyone has potential, regardless of class or race",
+            "The forest beyond the village has been quiet lately — a good sign for beginners"
+          ]
+        }
+      ],
+      "events": [
+        {
+          "key": "dummy_fight",
+          "description": "A practice combat encounter with a very weak training dummy",
+          "trigger": "objective_complete",
+          "trigger_condition": "practice_attack",
+          "event_data": {
+            "enemies": ["goblin"],
+            "narration_hint": "Greta sets up a special enchanted practice dummy that fights back — but gently. It looks like a straw goblin with button eyes. 'Don't worry, it can only tickle you!' she laughs."
+          }
+        }
+      ]
+    },
+    {
+      "chapter_number": 2,
+      "title": "Your First Real Encounter",
+      "summary": "The player encounters a minor threat near the village and puts their training into practice in a real combat scenario. Success completes the tutorial.",
+      "setting_description": "The road from Oakhollow winds through gentle farmland before reaching the edge of the Greenwood. Fields of wheat sway in the breeze. A stone bridge crosses a shallow creek where the road meets the forest.",
+      "dm_guidance": "This is the final tutorial chapter. The player should face ONE easy enemy (a single goblin or wolf) in real combat. Before combat starts, remind the player what they learned: they can attack, cast spells, dodge, or use items. After they win, congratulate them enthusiastically. Greta (if she accompanied them) or a passing traveler can cheer them on. Award XP after combat. End with an encouraging sendoff that makes them feel ready for real adventures. Tone: exciting but safe, triumphant ending.",
+      "opening_narration": "The road out of Oakhollow stretches before you, winding between golden wheat fields toward the distant treeline. The morning air is fresh and full of birdsong. This is it — your first real adventure, even if it's just a walk down the road. Greta's parting words echo in your mind: 'Trust your instincts, remember your training, and you'll do fine!'",
+      "transition_narration": null,
+      "objectives": [
+        {
+          "key": "win_combat",
+          "description": "Defeat an enemy in real combat",
+          "hint": "Something lurks near the bridge ahead",
+          "required": true,
+          "sort_order": 1,
+          "detection_keywords": ["defeated", "combat", "victory", "won", "killed", "slain", "enemies defeated"],
+          "detection_prompt": "Has the player won a combat encounter against a real enemy (not a training dummy)?"
+        },
+        {
+          "key": "complete_tutorial",
+          "description": "Receive congratulations and complete the tutorial",
+          "hint": "Talk to the traveler or reflect on your victory",
+          "required": true,
+          "sort_order": 2,
+          "detection_keywords": ["congratulations", "well done", "proud", "ready", "adventure", "tutorial", "complete"],
+          "detection_prompt": "Has the player been congratulated or acknowledged for completing their first real encounter?"
+        }
+      ],
+      "npcs": [
+        {
+          "name": "Old Jasper",
+          "role": "encouragement",
+          "personality": "A kindly old traveling merchant who witnessed the fight. He is impressed and encouraging, offering a small reward (a healing potion) as thanks for keeping the road safe.",
+          "appearance": "A wiry old man with a white beard and a loaded mule. He wears a patched cloak and has kind, crinkled eyes.",
+          "dialogue_hooks": [
+            {
+              "topic": "the fight",
+              "response_guidance": "He saw the whole thing and is genuinely impressed. 'I've been traveling this road for thirty years and I've seen a lot of green adventurers. You've got real potential!' He offers a healing potion as thanks."
+            },
+            {
+              "topic": "what's next",
+              "response_guidance": "He suggests the player is ready for real adventures now. 'Head back to Oakhollow and see what quests are on the board. The world needs heroes like you.' This signals the tutorial is complete."
+            }
+          ],
+          "knowledge": [
+            "He travels this road regularly between villages",
+            "He's seen the goblin problem getting worse lately",
+            "He carries a spare healing potion he's happy to give away"
+          ]
+        }
+      ],
+      "events": [
+        {
+          "key": "bridge_goblin",
+          "description": "A lone goblin ambushes the player at the stone bridge",
+          "trigger": "dm_discretion",
+          "trigger_condition": null,
+          "event_data": {
+            "enemies": ["goblin"],
+            "narration_hint": "A scraggly goblin scrambles out from under the stone bridge, brandishing a rusty knife and squealing a war cry that is more pathetic than frightening. This is a straightforward fight — one goblin, one player."
+          }
+        }
+      ]
+    }
+  ]
+}
