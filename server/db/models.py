@@ -43,6 +43,7 @@ class Campaign(Base):
     sessions: Mapped[list["Session"]] = relationship(back_populates="campaign")
     characters: Mapped[list["Character"]] = relationship(back_populates="campaign")
     join_requests: Mapped[list["JoinRequest"]] = relationship(back_populates="campaign")
+    campaign_story: Mapped["CampaignStory | None"] = relationship(back_populates="campaign", uselist=False)
 
 
 class Session(Base):
@@ -124,6 +125,7 @@ class GameState(Base):
     )
     active_effects: Mapped[dict | None] = mapped_column(JSON, default=list)
     creation_step: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    rolling_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     session: Mapped["Session"] = relationship(back_populates="game_state")
 
@@ -164,3 +166,136 @@ class JoinRequest(Base):
     campaign: Mapped["Campaign"] = relationship(back_populates="join_requests")
     player: Mapped["Player"] = relationship()
     character: Mapped["Character"] = relationship()
+
+
+# ---- Story Engine Models ----
+
+
+class StoryTemplate(Base):
+    """An authored campaign story — canonical Foray lore."""
+    __tablename__ = "story_templates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    author: Mapped[str] = mapped_column(String(200), default="Foray Team")
+    synopsis: Mapped[str] = mapped_column(Text, nullable=False)
+    setting: Mapped[str] = mapped_column(Text, default="")
+    recommended_level: Mapped[int] = mapped_column(Integer, default=1)
+    recommended_players: Mapped[str] = mapped_column(String(20), default="1-4")
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    chapters: Mapped[list["Chapter"]] = relationship(
+        back_populates="story", order_by="Chapter.chapter_number"
+    )
+
+
+class Chapter(Base):
+    """A chapter within a story — its own focused context for the DM."""
+    __tablename__ = "chapters"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    story_id: Mapped[int] = mapped_column(ForeignKey("story_templates.id"), nullable=False)
+    chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    setting_description: Mapped[str] = mapped_column(Text, default="")
+    dm_guidance: Mapped[str] = mapped_column(Text, default="")
+    opening_narration: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transition_narration: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    story: Mapped["StoryTemplate"] = relationship(back_populates="chapters")
+    objectives: Mapped[list["Objective"]] = relationship(
+        back_populates="chapter", order_by="Objective.sort_order"
+    )
+    story_npcs: Mapped[list["StoryNPC"]] = relationship(back_populates="chapter")
+    story_events: Mapped[list["StoryEvent"]] = relationship(back_populates="chapter")
+
+
+class Objective(Base):
+    """A chapter objective that must be completed to advance the story."""
+    __tablename__ = "objectives"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chapter_id: Mapped[int] = mapped_column(ForeignKey("chapters.id"), nullable=False)
+    key: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    hint: Mapped[str] = mapped_column(Text, default="")
+    required: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    detection_keywords: Mapped[dict | None] = mapped_column(JSON, default=list)
+    detection_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    chapter: Mapped["Chapter"] = relationship(back_populates="objectives")
+
+
+class StoryNPC(Base):
+    """A key NPC in a chapter with personality, dialogue hooks, and knowledge."""
+    __tablename__ = "story_npcs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chapter_id: Mapped[int] = mapped_column(ForeignKey("chapters.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    role: Mapped[str] = mapped_column(String(100), default="")
+    personality: Mapped[str] = mapped_column(Text, default="")
+    appearance: Mapped[str] = mapped_column(Text, default="")
+    dialogue_hooks: Mapped[dict | None] = mapped_column(JSON, default=list)
+    knowledge: Mapped[dict | None] = mapped_column(JSON, default=list)
+
+    chapter: Mapped["Chapter"] = relationship(back_populates="story_npcs")
+
+
+class StoryEvent(Base):
+    """A triggered event/encounter within a chapter."""
+    __tablename__ = "story_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chapter_id: Mapped[int] = mapped_column(ForeignKey("chapters.id"), nullable=False)
+    key: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    trigger: Mapped[str] = mapped_column(String(50), default="dm_discretion")
+    trigger_condition: Mapped[str | None] = mapped_column(Text, nullable=True)
+    event_data: Mapped[dict | None] = mapped_column(JSON, default=dict)
+
+    chapter: Mapped["Chapter"] = relationship(back_populates="story_events")
+
+
+class CampaignStory(Base):
+    """Links a Campaign to a StoryTemplate and tracks chapter progress."""
+    __tablename__ = "campaign_stories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), unique=True, nullable=False)
+    story_id: Mapped[int] = mapped_column(ForeignKey("story_templates.id"), nullable=False)
+    current_chapter_number: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(20), default="active")
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    chapter_summaries: Mapped[dict | None] = mapped_column(JSON, default=dict)
+
+    campaign: Mapped["Campaign"] = relationship(back_populates="campaign_story")
+    story: Mapped["StoryTemplate"] = relationship()
+    chapter_progress: Mapped[list["ChapterProgress"]] = relationship(back_populates="campaign_story")
+
+
+class ChapterProgress(Base):
+    """Tracks objective completion for a specific chapter in a campaign playthrough."""
+    __tablename__ = "chapter_progress"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_story_id: Mapped[int] = mapped_column(ForeignKey("campaign_stories.id"), nullable=False)
+    chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active")
+    objectives_completed: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    campaign_story: Mapped["CampaignStory"] = relationship(back_populates="chapter_progress")

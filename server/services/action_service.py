@@ -378,6 +378,12 @@ async def process_action(
 
         # else: question — fall through to DM AI path below
 
+    # --- Load story context ---
+    _chapter_context = None
+    if not is_character_creation:
+        from server.ai.story_engine import build_chapter_context
+        _chapter_context = build_chapter_context(session.campaign_id, db)
+
     # --- Call DM ---
     action_for_ai = action_text
     if acting_character and not is_character_creation:
@@ -390,6 +396,7 @@ async def process_action(
         characters=characters,
         recent_logs=recent_logs,
         mode="character_creation" if is_character_creation else "play",
+        chapter_context=_chapter_context,
     )
 
     # ==========================================================
@@ -442,6 +449,35 @@ async def process_action(
     )
     db.add(log_entry)
     db.commit()
+
+    # ==========================================================
+    # MILESTONE CHECK — track story objective completion
+    # ==========================================================
+    if _chapter_context and not is_character_creation and game_state.game_mode != "combat":
+        from server.ai.story_engine import (
+            check_keyword_matches,
+            confirm_objective,
+            mark_objective_complete,
+        )
+        from server.services.story_service import get_current_chapter
+        chapter_data = get_current_chapter(session.campaign_id, db)
+        if chapter_data:
+            keyword_hits = check_keyword_matches(narration, action_text, chapter_data)
+            recent_narrations = [
+                log.narration_text for log in recent_logs[-3:] if log.narration_text
+            ] + [narration]
+
+            for obj in keyword_hits:
+                result = await confirm_objective(obj, recent_narrations, action_text)
+                if result.get("completed"):
+                    mark_objective_complete(
+                        chapter_data["campaign_story_id"],
+                        chapter_data["chapter_number"],
+                        obj["key"],
+                        result.get("summary", ""),
+                        turn_number,
+                        db,
+                    )
 
     # ==========================================================
     # PHASE 3 — Combat start (separate event)

@@ -54,6 +54,13 @@ def _run_migrations():
             if "character_id" not in existing:
                 conn.execute(text("ALTER TABLE game_log ADD COLUMN character_id INTEGER"))
 
+    # GameState: add rolling_summary column for session continuity
+    if "game_state" in inspector.get_table_names():
+        existing = {col["name"] for col in inspector.get_columns("game_state")}
+        with engine.begin() as conn:
+            if "rolling_summary" not in existing:
+                conn.execute(text("ALTER TABLE game_state ADD COLUMN rolling_summary TEXT"))
+
 
 def _backfill_invite_codes():
     """Generate invite codes for existing campaigns that don't have one."""

@@ -10,6 +10,7 @@ from server.routes.campaigns import router as campaigns_router
 from server.routes.actions import router as actions_router
 from server.routes.characters import router as characters_router
 from server.routes.ws import router as ws_router
+from server.routes.stories import router as stories_router
 
 
 def create_app() -> FastAPI:
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(campaigns_router, prefix="/api")
     app.include_router(actions_router, prefix="/api")
     app.include_router(characters_router, prefix="/api")
+    app.include_router(stories_router)
 
     @app.on_event("startup")
     def on_startup():

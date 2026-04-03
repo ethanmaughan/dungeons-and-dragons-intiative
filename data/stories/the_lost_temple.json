@@ -1,0 +1,228 @@
+{
+  "slug": "the_lost_temple",
+  "title": "The Lost Temple of Ashara",
+  "author": "Ethan Maughan",
+  "synopsis": "A forgotten temple resurfaces in the Ashwood, and with it, an ancient evil stirs. The party must unravel the temple's secrets before the Cult of the Hollow reclaims the artifact within.",
+  "setting": "The Ashwood, a dense primeval forest at the edge of the kingdom. Villages dot the treeline. An ancient civilization once thrived here.",
+  "recommended_level": 1,
+  "recommended_players": "1-4",
+  "chapters": [
+    {
+      "chapter_number": 1,
+      "title": "The Village of Thornwall",
+      "summary": "The party arrives in Thornwall, a village troubled by disappearances. They must investigate, gather clues, and learn about the temple's location.",
+      "setting_description": "Thornwall is a modest logging village of fifty souls. Timber houses line a muddy main road. The Ashwood looms on every horizon, dark and whispering.",
+      "dm_guidance": "This is the setup chapter. Let players explore freely. The village has a tavern (The Stump), a general store, and a small shrine. Steer conversations toward the disappearances — villagers are scared. Elder Maren and Fenn the Hunter are the key NPCs who provide the quest hook. Do NOT reveal the cult yet. Tone: uneasy, rural, whispered rumors.",
+      "opening_narration": "The road to Thornwall narrows as the Ashwood closes in around you. By the time you see the village gates, the canopy above has stolen the last of the daylight. Torchlight flickers ahead. A nervous guard waves you through with a curt nod, barely meeting your eyes.",
+      "transition_narration": "With the elder's blessing and Fenn's reluctant guidance, you set out at dawn. The Ashwood swallows you whole within minutes — the village, the road, even the sky disappearing behind a wall of ancient trees. Somewhere ahead, the lost temple waits.",
+      "objectives": [
+        {
+          "key": "talk_to_elder",
+          "description": "Speak with Elder Maren about the disappearances",
+          "hint": "The villagers speak of Elder Maren with reverence — she holds court at the village shrine",
+          "required": true,
+          "sort_order": 1,
+          "detection_keywords": ["elder", "maren", "disappearances", "missing", "vanished"],
+          "detection_prompt": "Has the party had a meaningful conversation with Elder Maren about the disappearances in Thornwall?"
+        },
+        {
+          "key": "find_clue",
+          "description": "Discover a clue pointing to the temple's location",
+          "hint": "Fenn the hunter found strange tracks near the old ruins",
+          "required": true,
+          "sort_order": 2,
+          "detection_keywords": ["tracks", "ruins", "temple", "map", "fenn", "clearing", "location"],
+          "detection_prompt": "Has the party obtained concrete information about where the temple is located — through a map, directions from Fenn, tracks, or another discovery?"
+        },
+        {
+          "key": "supplies",
+          "description": "Prepare supplies for the journey into the Ashwood",
+          "hint": "The general store has torches, rope, and rations",
+          "required": false,
+          "sort_order": 3,
+          "detection_keywords": ["supplies", "torches", "rope", "rations", "prepare", "provision", "store", "buy"],
+          "detection_prompt": null
+        }
+      ],
+      "npcs": [
+        {
+          "name": "Elder Maren",
+          "role": "quest_giver",
+          "personality": "Wise, weary, protective of her village. Speaks slowly and deliberately. Carries the weight of the disappearances on her shoulders.",
+          "appearance": "A stout woman in her sixties with silver hair pulled back tightly. She wears a simple wool dress and carries a gnarled walking stick carved with old symbols.",
+          "dialogue_hooks": [
+            {
+              "topic": "disappearances",
+              "response_guidance": "Three villagers vanished over two weeks. All were last seen near the old logging road that leads deeper into the Ashwood. She is frightened but will not say so directly — she deflects with duty and practicality."
+            },
+            {
+              "topic": "the temple",
+              "response_guidance": "She knows the old stories — a temple to a forgotten god, swallowed by the forest centuries ago. She thought it was just legend until now. Her grandmother spoke of it in hushed tones."
+            },
+            {
+              "topic": "strangers",
+              "response_guidance": "She does NOT know about the cult by name. If pressed, she admits hooded strangers have passed through recently — quiet, always heading into the woods, never stopping at the tavern."
+            }
+          ],
+          "knowledge": [
+            "Three villagers have disappeared in two weeks",
+            "All were last seen near the old logging road",
+            "Legends speak of a temple deep in the Ashwood",
+            "Hooded strangers have been passing through recently",
+            "Her grandmother warned her about the temple as a child"
+          ]
+        },
+        {
+          "name": "Fenn",
+          "role": "guide",
+          "personality": "Gruff, practical, brave but not foolish. A hunter who knows the Ashwood better than anyone. Few words, direct. Respects strength and honesty.",
+          "appearance": "A lean man in his thirties with a scarred jaw and weathered leather armor. A longbow is never far from his hand. His eyes are always scanning the treeline.",
+          "dialogue_hooks": [
+            {
+              "topic": "the tracks",
+              "response_guidance": "He found boot prints — many of them — leading to a clearing he has never seen before. The trees had been pushed aside, like something enormous walked through. Unnatural. He won't say he's scared, but he is."
+            },
+            {
+              "topic": "guiding the party",
+              "response_guidance": "He will guide them to the clearing if asked, but he will NOT enter the temple itself. He has a family. He'll wait at the clearing for one day, then return to the village."
+            },
+            {
+              "topic": "the Ashwood",
+              "response_guidance": "The forest has been wrong lately. Animals fleeing deeper. Birds gone silent in the eastern reaches. Something is stirring."
+            }
+          ],
+          "knowledge": [
+            "Strange boot prints lead deep into the Ashwood",
+            "He found a clearing that was not there a month ago",
+            "The trees appeared to have been pushed aside by force",
+            "The forest animals are behaving strangely — fleeing east"
+          ]
+        },
+        {
+          "name": "Brynn",
+          "role": "shopkeeper",
+          "personality": "Cheerful but nervous. Runs the general store. Talks too much when anxious. Overcharges travelers but gives discounts to anyone investigating the disappearances.",
+          "appearance": "A portly halfling with ruddy cheeks and an apron perpetually dusted with flour. She fidgets with her hands when worried.",
+          "dialogue_hooks": [
+            {
+              "topic": "supplies",
+              "response_guidance": "She has torches, rope, rations, and basic adventuring supplies. She gives a discount if the party mentions they're investigating. She's grateful someone is doing something."
+            },
+            {
+              "topic": "the missing villagers",
+              "response_guidance": "One of the missing was her cousin, Tomas. She breaks down briefly when talking about him. He was heading to check his traps near the old road."
+            }
+          ],
+          "knowledge": [
+            "Her cousin Tomas is one of the missing",
+            "He was checking traps near the old logging road",
+            "Business has been terrible since the disappearances — no one goes into the woods"
+          ]
+        }
+      ],
+      "events": [
+        {
+          "key": "wolves_on_road",
+          "description": "A pair of wolves, driven from the deep woods by something, attacks on the road to Thornwall",
+          "trigger": "dm_discretion",
+          "trigger_condition": null,
+          "event_data": {
+            "enemies": ["wolf"],
+            "narration_hint": "The wolf seems desperate, not predatory — something deeper in the forest drove it out. It fights to the death rather than flee back into the Ashwood."
+          }
+        },
+        {
+          "key": "stranger_sighting",
+          "description": "A hooded figure is seen at the edge of the village at night",
+          "trigger": "objective_complete",
+          "trigger_condition": "talk_to_elder",
+          "event_data": {
+            "narration_hint": "After speaking with the elder, a cloaked figure is briefly visible at the treeline as dusk settles. It watches the party for a long moment, then melts into the Ashwood before anyone can react. The guard at the gate swears he saw nothing."
+          }
+        }
+      ]
+    },
+    {
+      "chapter_number": 2,
+      "title": "Into the Ashwood",
+      "summary": "The party journeys into the deep forest with Fenn as their guide. They encounter ancient ruins, hostile wildlife, and signs of the cult's passage before reaching the temple clearing.",
+      "setting_description": "The deep Ashwood. Massive ancient trees block out the sky. Bioluminescent moss clings to the trunks. The air is thick, damp, and carries a faint metallic scent. Old stone markers, half-swallowed by roots, line a forgotten path.",
+      "dm_guidance": "This is the journey chapter. Build tension through atmosphere — the forest getting darker, stranger, more oppressive. Fenn grows increasingly uneasy. The party finds signs of the cult (ritual circles, carved symbols, stripped branches) but does not encounter cultists directly yet. One combat encounter with corrupted wildlife (wolf or bear driven mad by the temple's influence). End with the party reaching the clearing and seeing the temple entrance for the first time. Tone: foreboding, wonder, mounting dread.",
+      "opening_narration": "Fenn leads you off the main road and onto a game trail that quickly disappears into the undergrowth. Within an hour, the forest has changed. The trees here are ancient — thick as houses, their canopy so dense that noon feels like twilight. Fenn moves in silence, his hand never leaving his bow.",
+      "transition_narration": "The temple entrance looms before you — a great stone archway carved with symbols that seem to writhe in your torchlight. Fenn stops at the treeline. 'This is as far as I go,' he says quietly. 'I'll wait one day. After that...' He doesn't finish. The darkness beyond the archway breathes.",
+      "objectives": [
+        {
+          "key": "find_cult_signs",
+          "description": "Discover signs of the cult's passage through the forest",
+          "hint": "Strange markings and cleared areas dot the trail",
+          "required": true,
+          "sort_order": 1,
+          "detection_keywords": ["symbols", "markings", "ritual", "circle", "carved", "cult", "robes", "clearing"],
+          "detection_prompt": "Has the party found concrete evidence of cult activity in the forest — ritual circles, carved symbols, abandoned campsites, or similar signs?"
+        },
+        {
+          "key": "survive_wildlife",
+          "description": "Survive an encounter with corrupted wildlife",
+          "hint": "The animals in this part of the forest are not right",
+          "required": true,
+          "sort_order": 2,
+          "detection_keywords": ["wolf", "bear", "beast", "attack", "combat", "fight", "defeated"],
+          "detection_prompt": "Has the party survived a combat encounter with wildlife in the Ashwood?"
+        },
+        {
+          "key": "reach_temple",
+          "description": "Reach the temple clearing",
+          "hint": "Fenn knows the way to the clearing he discovered",
+          "required": true,
+          "sort_order": 3,
+          "detection_keywords": ["clearing", "temple", "entrance", "archway", "arrived", "reached"],
+          "detection_prompt": "Has the party arrived at the temple clearing and seen the temple entrance?"
+        }
+      ],
+      "npcs": [
+        {
+          "name": "Fenn",
+          "role": "guide",
+          "personality": "Increasingly tense as they go deeper. Speaks less. Points out dangers with sharp gestures. His expertise is invaluable but his courage is fading.",
+          "appearance": "Same weathered hunter, but his jaw is tighter, his eyes wider. He flinches at sounds that weren't there yesterday.",
+          "dialogue_hooks": [
+            {
+              "topic": "the forest changes",
+              "response_guidance": "The Ashwood is wrong here. Trees growing in spirals. Moss that glows. He has hunted these woods for twenty years and has never seen this part. It should not exist."
+            },
+            {
+              "topic": "turning back",
+              "response_guidance": "He considers it. If the party asks him to stay, a DC 13 Charisma check convinces him. Otherwise he says he will wait at the last campsite."
+            }
+          ],
+          "knowledge": [
+            "The deeper forest is completely unfamiliar to him despite decades of hunting",
+            "The bioluminescent moss appeared recently — within weeks",
+            "He found the clearing by following the boot prints"
+          ]
+        }
+      ],
+      "events": [
+        {
+          "key": "corrupted_wolves",
+          "description": "Wolves corrupted by the temple's influence attack the party",
+          "trigger": "dm_discretion",
+          "trigger_condition": null,
+          "event_data": {
+            "enemies": ["wolf", "wolf"],
+            "narration_hint": "These wolves have glowing amber eyes and patches of bioluminescent moss growing in their fur. They attack with unnatural ferocity and do not flee, even when wounded. Something has twisted them."
+          }
+        },
+        {
+          "key": "ritual_site",
+          "description": "The party discovers an abandoned cult ritual site",
+          "trigger": "dm_discretion",
+          "trigger_condition": null,
+          "event_data": {
+            "narration_hint": "A circle of stones in a small clearing. The ground is scorched black in a perfect ring. Symbols are carved into the surrounding trees — fresh, the sap still running. Discarded dark robes lie in a pile. Whatever happened here was recent."
+          }
+        }
+      ]
+    }
+  ]
+}
