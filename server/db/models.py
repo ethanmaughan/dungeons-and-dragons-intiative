@@ -240,6 +240,9 @@ class StoryNPC(Base):
     chapter_id: Mapped[int] = mapped_column(ForeignKey("chapters.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     role: Mapped[str] = mapped_column(String(100), default="")
+    race: Mapped[str] = mapped_column(String(50), default="human")
+    social_role: Mapped[str] = mapped_column(String(50), default="peasant")
+    default_disposition: Mapped[int | None] = mapped_column(Integer, nullable=True)
     personality: Mapped[str] = mapped_column(Text, default="")
     appearance: Mapped[str] = mapped_column(Text, default="")
     dialogue_hooks: Mapped[dict | None] = mapped_column(JSON, default=list)
@@ -299,3 +302,42 @@ class ChapterProgress(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     campaign_story: Mapped["CampaignStory"] = relationship(back_populates="chapter_progress")
+
+
+class NPCState(Base):
+    """Persistent per-campaign NPC state: disposition, memories, interaction history."""
+    __tablename__ = "npc_states"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), nullable=False)
+    story_npc_id: Mapped[int | None] = mapped_column(ForeignKey("story_npcs.id"), nullable=True)
+    npc_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    npc_race: Mapped[str] = mapped_column(String(50), default="human")
+    npc_social_role: Mapped[str] = mapped_column(String(50), default="peasant")
+    disposition: Mapped[int] = mapped_column(Integer, default=50)
+    memories: Mapped[dict | None] = mapped_column(JSON, default=list)
+    interaction_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_interaction_turn: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    campaign: Mapped["Campaign"] = relationship()
+
+
+class PartyProfile(Base):
+    """Per-campaign behavioral aggregates — tracks how the party plays."""
+    __tablename__ = "party_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), unique=True, nullable=False)
+    behavior_counts: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    total_actions_classified: Mapped[int] = mapped_column(Integer, default=0)
+    dominant_tendency: Mapped[str] = mapped_column(String(50), default="neutral")
+    recent_tendency: Mapped[str] = mapped_column(String(50), default="neutral")
+    recent_actions: Mapped[dict | None] = mapped_column(JSON, default=list)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    campaign: Mapped["Campaign"] = relationship()

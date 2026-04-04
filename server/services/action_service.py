@@ -378,11 +378,15 @@ async def process_action(
 
         # else: question — fall through to DM AI path below
 
-    # --- Load story context ---
+    # --- Load story + party context ---
     _chapter_context = None
+    _party_profile_summary = None
     if not is_character_creation:
         from server.ai.story_engine import build_chapter_context
-        _chapter_context = build_chapter_context(session.campaign_id, db)
+        _chapter_context = build_chapter_context(session.campaign_id, db, characters=characters)
+        from server.engine.party_profile import get_or_create_party_profile, get_profile_summary
+        _profile = get_or_create_party_profile(session.campaign_id, db)
+        _party_profile_summary = get_profile_summary(_profile)
 
     # --- Call DM ---
     action_for_ai = action_text
@@ -398,6 +402,7 @@ async def process_action(
         mode="character_creation" if is_character_creation else "play",
         chapter_context=_chapter_context,
         rolling_summary=game_state.rolling_summary if game_state else None,
+        party_profile_summary=_party_profile_summary,
     )
 
     # ==========================================================
@@ -479,6 +484,43 @@ async def process_action(
                         turn_number,
                         db,
                     )
+
+    # ==========================================================
+    # BEHAVIOR CLASSIFICATION — feed NPC disposition + party profile
+    # ==========================================================
+    if not is_character_creation and game_state and game_state.game_mode == "exploration":
+        from server.ai.behavior_classifier import classify_action
+        from server.engine.disposition import get_or_create_npc_state, apply_behavior_shift, add_npc_memory
+        from server.engine.party_profile import record_behavior
+
+        npc_names = []
+        if _chapter_context:
+            _ch = get_current_chapter(session.campaign_id, db) if 'get_current_chapter' not in dir() else None
+            if not _ch:
+                from server.services.story_service import get_current_chapter as _gc
+                _ch = _gc(session.campaign_id, db)
+            if _ch:
+                npc_names = [n["name"] for n in _ch.get("npcs", [])]
+
+        classification = await classify_action(action_text, narration, npc_names)
+
+        if classification.get("behavior") and classification["behavior"] != "neutral":
+            record_behavior(_profile, classification["behavior"])
+
+            if classification.get("involves_npc") and classification.get("npc_name"):
+                npc_state = get_or_create_npc_state(
+                    session.campaign_id, classification["npc_name"], characters, db,
+                )
+                apply_behavior_shift(npc_state, classification["behavior"])
+                actor_name_for_mem = acting_character.character_name if acting_character else "Party"
+                add_npc_memory(
+                    npc_state, turn_number,
+                    summary=f"{actor_name_for_mem}: {action_text[:80]}",
+                    sentiment=classification["behavior"],
+                    player=actor_name_for_mem,
+                )
+
+            db.commit()
 
     # ==========================================================
     # ROLLING SUMMARY — preserve context beyond the 20-turn window

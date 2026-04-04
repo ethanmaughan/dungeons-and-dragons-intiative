@@ -54,6 +54,17 @@ def _run_migrations():
             if "character_id" not in existing:
                 conn.execute(text("ALTER TABLE game_log ADD COLUMN character_id INTEGER"))
 
+    # StoryNPC: add demographic fields
+    if "story_npcs" in inspector.get_table_names():
+        existing = {col["name"] for col in inspector.get_columns("story_npcs")}
+        with engine.begin() as conn:
+            if "race" not in existing:
+                conn.execute(text("ALTER TABLE story_npcs ADD COLUMN race VARCHAR(50) DEFAULT 'human'"))
+            if "social_role" not in existing:
+                conn.execute(text("ALTER TABLE story_npcs ADD COLUMN social_role VARCHAR(50) DEFAULT 'peasant'"))
+            if "default_disposition" not in existing:
+                conn.execute(text("ALTER TABLE story_npcs ADD COLUMN default_disposition INTEGER"))
+
     # GameState: add rolling_summary column for session continuity
     if "game_state" in inspector.get_table_names():
         existing = {col["name"] for col in inspector.get_columns("game_state")}

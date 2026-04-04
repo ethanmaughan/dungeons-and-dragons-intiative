@@ -48,6 +48,9 @@
         {
           "name": "Greta",
           "role": "training_master",
+          "race": "human",
+          "social_role": "guard",
+          "default_disposition": 80,
           "personality": "Warm, encouraging, patient. She has trained hundreds of adventurers and genuinely enjoys helping beginners. She gives clear, practical advice without being condescending. She laughs easily and tells bad jokes.",
           "appearance": "A broad-shouldered human woman in her forties with short red hair, laugh lines, and calloused hands. She wears well-worn leather armor and carries a wooden practice sword at her hip.",
           "dialogue_hooks": [
@@ -117,6 +120,9 @@
         {
           "name": "Old Jasper",
           "role": "encouragement",
+          "race": "human",
+          "social_role": "merchant",
+          "default_disposition": 70,
           "personality": "A kindly old traveling merchant who witnessed the fight. He is impressed and encouraging, offering a small reward (a healing potion) as thanks for keeping the road safe.",
           "appearance": "A wiry old man with a white beard and a loaded mule. He wears a patched cloak and has kind, crinkled eyes.",
           "dialogue_hooks": [

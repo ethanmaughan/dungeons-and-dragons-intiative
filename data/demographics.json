@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "race_attitudes": {
+    "dwarf":      {"elf": -15, "halfling": 5, "human": 0, "half_orc": -10, "gnome": 5, "tiefling": -10, "dragonborn": -5, "half_elf": -5},
+    "elf":        {"dwarf": -10, "halfling": 5, "human": -5, "half_orc": -15, "gnome": 5, "tiefling": -5, "dragonborn": 0, "half_elf": 10},
+    "human":      {"dwarf": 0, "elf": 0, "halfling": 5, "half_orc": -10, "gnome": 0, "tiefling": -15, "dragonborn": -5, "half_elf": 0},
+    "halfling":   {"dwarf": 5, "elf": 5, "human": 5, "half_orc": -5, "gnome": 10, "tiefling": -5, "dragonborn": 0, "half_elf": 5},
+    "half_orc":   {"dwarf": -10, "elf": -15, "human": -5, "halfling": 0, "gnome": -5, "tiefling": 5, "dragonborn": 5, "half_elf": -5},
+    "gnome":      {"dwarf": 5, "elf": 5, "human": 5, "halfling": 10, "half_orc": -10, "tiefling": 0, "dragonborn": 0, "half_elf": 5},
+    "tiefling":   {"dwarf": -10, "elf": -5, "human": -15, "halfling": 0, "half_orc": 5, "gnome": 0, "dragonborn": 0, "half_elf": -5},
+    "dragonborn": {"dwarf": -5, "elf": 0, "human": 0, "halfling": 0, "half_orc": 5, "gnome": 0, "tiefling": 0, "half_elf": 0}
+  },
+  "class_attitudes": {
+    "noble":     {"paladin": 10, "cleric": 5, "wizard": 5, "rogue": -15, "barbarian": -10, "warlock": -10, "fighter": 0, "bard": 5, "ranger": 0, "monk": 0, "sorcerer": 0, "druid": -5},
+    "merchant":  {"paladin": 5, "cleric": 5, "rogue": -10, "bard": 5, "wizard": 0, "fighter": 0, "barbarian": -5, "warlock": -5, "ranger": 0, "monk": 0, "sorcerer": 0, "druid": 0},
+    "peasant":   {"cleric": 10, "paladin": 5, "wizard": -10, "warlock": -15, "sorcerer": -10, "rogue": -5, "fighter": 5, "barbarian": 0, "bard": 10, "ranger": 5, "monk": 5, "druid": 5},
+    "criminal":  {"rogue": 10, "warlock": 5, "bard": 5, "paladin": -15, "cleric": -10, "fighter": -5, "wizard": 0, "barbarian": 0, "ranger": -5, "monk": -5, "sorcerer": 0, "druid": 0},
+    "scholar":   {"wizard": 15, "cleric": 5, "bard": 5, "barbarian": -10, "fighter": -5, "rogue": -5, "warlock": 0, "sorcerer": 5, "ranger": 0, "monk": 5, "paladin": 0, "druid": 5},
+    "guard":     {"paladin": 10, "fighter": 10, "rogue": -10, "warlock": -5, "barbarian": -5, "cleric": 5, "wizard": 0, "bard": 0, "ranger": 5, "monk": 0, "sorcerer": 0, "druid": 0},
+    "innkeeper": {"bard": 10, "paladin": 5, "cleric": 5, "rogue": -5, "fighter": 5, "barbarian": 0, "wizard": 0, "warlock": -5, "ranger": 5, "monk": 0, "sorcerer": 0, "druid": 0}
+  },
+  "regional_modifiers": {
+    "mining_town":  {"fighter": 10, "barbarian": 5, "wizard": -5, "rogue": -5},
+    "port_city":    {"bard": 5, "rogue": 5, "ranger": -5, "druid": -5},
+    "forest_edge":  {"ranger": 10, "druid": 10, "wizard": -5, "barbarian": -5},
+    "holy_city":    {"cleric": 15, "paladin": 10, "warlock": -15, "rogue": -10},
+    "arcane_tower": {"wizard": 15, "sorcerer": 10, "barbarian": -10, "fighter": -5},
+    "frontier":     {"fighter": 5, "ranger": 10, "barbarian": 5},
+    "capital":      {"paladin": 5, "wizard": 5, "bard": 5, "barbarian": -10},
+    "village":      {"cleric": 5, "ranger": 5, "druid": 5, "warlock": -5}
+  },
+  "disposition_thresholds": {
+    "hostile":    {"max": 29, "label": "Hostile"},
+    "unfriendly": {"min": 30, "max": 44, "label": "Unfriendly"},
+    "neutral":    {"min": 45, "max": 64, "label": "Neutral"},
+    "friendly":   {"min": 65, "max": 84, "label": "Friendly"},
+    "allied":     {"min": 85, "label": "Allied"}
+  },
+  "behavior_impact": {
+    "aggressive": -8,
+    "threatening": -12,
+    "deceptive": -6,
+    "diplomatic": 6,
+    "helpful": 10,
+    "generous": 8,
+    "curious": 2,
+    "intimidating": -10,
+    "respectful": 5,
+    "rude": -7,
+    "heroic": 12,
+    "cowardly": -4,
+    "neutral": 0
+  }
+}

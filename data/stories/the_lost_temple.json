@@ -48,6 +48,9 @@
         {
           "name": "Elder Maren",
           "role": "quest_giver",
+          "race": "human",
+          "social_role": "scholar",
+          "default_disposition": 60,
           "personality": "Wise, weary, protective of her village. Speaks slowly and deliberately. Carries the weight of the disappearances on her shoulders.",
           "appearance": "A stout woman in her sixties with silver hair pulled back tightly. She wears a simple wool dress and carries a gnarled walking stick carved with old symbols.",
           "dialogue_hooks": [
@@ -75,6 +78,8 @@
         {
           "name": "Fenn",
           "role": "guide",
+          "race": "human",
+          "social_role": "guard",
           "personality": "Gruff, practical, brave but not foolish. A hunter who knows the Ashwood better than anyone. Few words, direct. Respects strength and honesty.",
           "appearance": "A lean man in his thirties with a scarred jaw and weathered leather armor. A longbow is never far from his hand. His eyes are always scanning the treeline.",
           "dialogue_hooks": [
@@ -101,6 +106,9 @@
         {
           "name": "Brynn",
           "role": "shopkeeper",
+          "race": "halfling",
+          "social_role": "merchant",
+          "default_disposition": 65,
           "personality": "Cheerful but nervous. Runs the general store. Talks too much when anxious. Overcharges travelers but gives discounts to anyone investigating the disappearances.",
           "appearance": "A portly halfling with ruddy cheeks and an apron perpetually dusted with flour. She fidgets with her hands when worried.",
           "dialogue_hooks": [
@@ -183,6 +191,8 @@
         {
           "name": "Fenn",
           "role": "guide",
+          "race": "human",
+          "social_role": "guard",
           "personality": "Increasingly tense as they go deeper. Speaks less. Points out dangers with sharp gestures. His expertise is invaluable but his courage is fading.",
           "appearance": "Same weathered hunter, but his jaw is tighter, his eyes wider. He flinches at sounds that weren't there yesterday.",
           "dialogue_hooks": [

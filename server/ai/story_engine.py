@@ -19,7 +19,7 @@ if AI_BACKEND == "claude":
 MILESTONE_MODEL = COMBAT_INTENT_MODEL
 
 
-def build_chapter_context(campaign_id: int, db) -> str | None:
+def build_chapter_context(campaign_id: int, db, characters: list | None = None) -> str | None:
     """Build the chapter context block for injection into the DM system prompt.
 
     Returns a formatted string to append to the prompt, or None if no story assigned.
@@ -48,13 +48,43 @@ def build_chapter_context(campaign_id: int, db) -> str | None:
         hint = f" — Hint: {obj['hint']}" if obj["hint"] and not obj["completed"] else ""
         lines.append(f"- {status} {obj['description']}{req}{hint}")
 
-    # NPCs
+    # NPCs — enriched with disposition and memories from NPCState
     if chapter["npcs"]:
+        from server.db.models import NPCState
+        from server.engine.disposition import get_disposition_label, get_or_create_npc_state
+
         lines.append("\n### Key NPCs This Chapter")
         for npc in chapter["npcs"]:
             lines.append(f"\n**{npc['name']}** ({npc['role']}): {npc['personality']}")
+            if npc.get("race"):
+                lines.append(f"  Race: {npc['race'].title()} | Social Role: {npc.get('social_role', 'peasant').title()}")
             if npc["appearance"]:
                 lines.append(f"  Appearance: {npc['appearance']}")
+
+            # Disposition and memories from persistent NPC state
+            npc_state = (
+                db.query(NPCState)
+                .filter(NPCState.campaign_id == campaign_id, NPCState.npc_name == npc["name"])
+                .first()
+            )
+            if not npc_state and characters:
+                npc_state = get_or_create_npc_state(
+                    campaign_id, npc["name"], characters, db,
+                    npc_race=npc.get("race", "human"),
+                    npc_social_role=npc.get("social_role", "peasant"),
+                    story_npc_id=npc.get("story_npc_id"),
+                    story_override=npc.get("default_disposition"),
+                )
+            if npc_state:
+                label = get_disposition_label(npc_state.disposition)
+                lines.append(f"  Disposition toward party: {label} ({npc_state.disposition}/100)")
+                memories = npc_state.memories or []
+                if memories:
+                    recent_mems = memories[-3:]
+                    mem_str = "; ".join(m["summary"] for m in recent_mems if m.get("summary"))
+                    if mem_str:
+                        lines.append(f"  Memories: {mem_str}")
+
             for hook in npc.get("dialogue_hooks", []):
                 lines.append(f"  When asked about {hook['topic']}: {hook['response_guidance']}")
 
