@@ -8,6 +8,13 @@
         <h1 class="text-3xl gold-text font-bold">Welcome, {{ player.display_name }}</h1>
     </div>
 
+    {% if not can_play %}
+    <div class="bg-yellow-900/30 border border-yellow-700 rounded px-4 py-3 mb-6 text-yellow-300 text-sm">
+        Subscribe to create campaigns and join games.
+        <a href="/account" class="gold-text hover:underline font-bold ml-1">Subscribe — $12/month</a>
+    </div>
+    {% endif %}
+
     <!-- Quick Actions -->
     <div class="flex gap-4 mb-10">
         <a href="/character/create" class="btn-action rounded px-6 py-3 font-bold">

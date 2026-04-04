@@ -10,6 +10,7 @@ from server.auth import get_current_player
 from server.db.database import get_db
 from server.db.models import Campaign, Character, GameLog, GameState, JoinRequest, Player
 from server.db.models import Session as GameSession
+from server.security import player_can_play
 
 templates = Jinja2Templates(directory="templates")
 router = APIRouter()
@@ -86,6 +87,7 @@ def dashboard(request: Request, db: DBSession = Depends(get_db)):
         "unassigned_chars": unassigned_chars,
         "pending_requests": pending_requests,
         "stories": available_stories,
+        "can_play": player_can_play(player),
     })
 
 
@@ -175,6 +177,8 @@ def game_session(request: Request, session_id: int, db: DBSession = Depends(get_
     player = get_current_player(request, db)
     if not player:
         return RedirectResponse(url="/login", status_code=303)
+    if not player_can_play(player):
+        return RedirectResponse(url="/account?reason=subscription_required", status_code=303)
 
     session = db.query(GameSession).filter(GameSession.id == session_id).first()
     if not session:

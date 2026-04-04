@@ -81,6 +81,23 @@ def _run_migrations():
             if "sprite_url" not in existing:
                 conn.execute(text("ALTER TABLE characters ADD COLUMN sprite_url VARCHAR(500)"))
 
+    # Player: add email, admin, and subscription fields
+    if "players" in inspector.get_table_names():
+        existing = {col["name"] for col in inspector.get_columns("players")}
+        with engine.begin() as conn:
+            if "email" not in existing:
+                conn.execute(text("ALTER TABLE players ADD COLUMN email VARCHAR(255)"))
+            if "is_admin" not in existing:
+                conn.execute(text("ALTER TABLE players ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
+            if "stripe_customer_id" not in existing:
+                conn.execute(text("ALTER TABLE players ADD COLUMN stripe_customer_id VARCHAR(255)"))
+            if "stripe_subscription_id" not in existing:
+                conn.execute(text("ALTER TABLE players ADD COLUMN stripe_subscription_id VARCHAR(255)"))
+            if "subscription_status" not in existing:
+                conn.execute(text("ALTER TABLE players ADD COLUMN subscription_status VARCHAR(50) DEFAULT 'none'"))
+            if "subscription_override" not in existing:
+                conn.execute(text("ALTER TABLE players ADD COLUMN subscription_override BOOLEAN DEFAULT FALSE"))
+
 
 def _backfill_invite_codes():
     """Generate invite codes for existing campaigns that don't have one."""

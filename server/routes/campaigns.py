@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session as DBSession
 from server.auth import get_current_player
 from server.db.database import get_db
 from server.db.models import Campaign, Character, JoinRequest
+from server.security import player_can_play
 from server.db.models import Session as GameSession
 
 router = APIRouter()
@@ -38,6 +39,8 @@ def create_campaign(
     player = get_current_player(request, db)
     if not player:
         return RedirectResponse(url="/login", status_code=303)
+    if not player_can_play(player):
+        return RedirectResponse(url="/account?reason=subscription_required", status_code=303)
 
     if visibility not in ("open", "private"):
         visibility = "open"
@@ -100,6 +103,8 @@ def join_campaign(
     player = get_current_player(request, db)
     if not player:
         return RedirectResponse(url="/login", status_code=303)
+    if not player_can_play(player):
+        return RedirectResponse(url="/account?reason=subscription_required", status_code=303)
 
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
@@ -223,6 +228,8 @@ def join_by_code(
     player = get_current_player(request, db)
     if not player:
         return RedirectResponse(url="/login", status_code=303)
+    if not player_can_play(player):
+        return RedirectResponse(url="/account?reason=subscription_required", status_code=303)
 
     code = invite_code.strip().upper()
     campaign = db.query(Campaign).filter(Campaign.invite_code == code).first()

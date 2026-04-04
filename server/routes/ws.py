@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session as DBSession
 from server.db.database import get_db, SessionLocal
 from server.db.models import Character, GameState, Player
 from server.db.models import Session as GameSession
+from server.security import player_can_play
 from server.ws.manager import manager
 from server.services.action_service import process_action
 from server.engine.combat import validate_move, execute_move
@@ -56,6 +57,11 @@ async def websocket_session(ws: WebSocket, session_id: int):
         player = db.query(Player).filter(Player.id == player_id).first()
         if not player:
             await ws.send_text(json.dumps({"type": "error", "message": "Player not found"}))
+            await ws.close()
+            return
+
+        if not player_can_play(player):
+            await ws.send_text(json.dumps({"type": "error", "message": "Subscription required"}))
             await ws.close()
             return
 

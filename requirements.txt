@@ -9,3 +9,5 @@ python-multipart==0.0.20
 psycopg2-binary==2.9.11
 itsdangerous==2.2.0
 ollama==0.6.1
+stripe==11.5.0
+slowapi==0.1.9

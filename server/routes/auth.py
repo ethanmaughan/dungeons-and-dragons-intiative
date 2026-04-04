@@ -34,6 +34,7 @@ def register(
     username: str = Form(...),
     password: str = Form(...),
     display_name: str = Form(""),
+    email: str = Form(""),
     db: DBSession = Depends(get_db),
 ):
     # Check if username already exists
@@ -44,10 +45,10 @@ def register(
             "error": "Username already taken.",
         })
 
-    if len(password) < 4:
+    if len(password) < 8:
         return templates.TemplateResponse("register.html", {
             "request": request,
-            "error": "Password must be at least 4 characters.",
+            "error": "Password must be at least 8 characters.",
         })
 
     # Create account
@@ -55,6 +56,7 @@ def register(
         username=username,
         password_hash=hash_password(password),
         display_name=display_name or username,
+        email=email.strip() or None,
     )
     db.add(player)
     db.commit()
