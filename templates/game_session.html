@@ -28,6 +28,12 @@
     }
     .online-dot.connected { background-color: #22c55e; }
     .online-dot.disconnected { background-color: #6b7280; }
+    #combat-map-container { background-color: #2d5a1d; }
+    .map-init-current {
+        background-color: rgba(212, 168, 67, 0.2);
+        border: 1px solid #d4a843;
+        border-radius: 4px;
+    }
 </style>
 {% endblock %}
 
@@ -270,26 +276,38 @@
         </div>
     </div>
 
-    <!-- Narrative Panel -->
-    <div id="narrative-panel" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-        {% if not logs %}
-        <div class="dm-narration narrative-text text-center py-12">
-            {% if game_state and game_state.game_mode == 'character_creation' %}
-            <p class="text-gray-500 text-lg italic">The Game Master is ready to help you create your character. Say hello!</p>
-            {% else %}
-            <p class="text-gray-500 text-lg italic">The adventure begins... What do you do?</p>
+    <!-- Main Content: narrative + combat map -->
+    <div id="main-content" class="flex-1 flex overflow-hidden">
+        <!-- Narrative Panel (full-width in exploration, sidebar in combat) -->
+        <div id="narrative-panel" class="overflow-y-auto px-6 py-4 space-y-4 transition-all duration-300"
+             style="width: 100%;">
+            {% if not logs %}
+            <div class="dm-narration narrative-text text-center py-12">
+                {% if game_state and game_state.game_mode == 'character_creation' %}
+                <p class="text-gray-500 text-lg italic">The Game Master is ready to help you create your character. Say hello!</p>
+                {% else %}
+                <p class="text-gray-500 text-lg italic">The adventure begins... What do you do?</p>
+                {% endif %}
+            </div>
             {% endif %}
-        </div>
-        {% endif %}
 
-        <div id="narrative-content">
-            {% for log in logs %}
-                {% include "partials/narrative_entry.html" %}
-            {% endfor %}
+            <div id="narrative-content">
+                {% for log in logs %}
+                    {% include "partials/narrative_entry.html" %}
+                {% endfor %}
+            </div>
+
+            <div id="notifications"></div>
         </div>
 
-        <!-- System notifications (player join/leave) -->
-        <div id="notifications"></div>
+        <!-- Combat Map (hidden until combat mode) -->
+        <div id="combat-map-container" class="hidden flex-1 relative" style="min-width: 0;">
+            <canvas id="combat-map" class="w-full h-full"></canvas>
+            <div id="map-initiative-overlay" class="absolute top-3 right-3 parchment rounded-lg p-3 w-48 opacity-90">
+                <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-2">Round <span id="map-round-number">1</span></h3>
+                <div id="map-initiative-list" class="space-y-1 text-sm"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Action Bar -->
@@ -328,6 +346,176 @@
     let isMyTurn = true;  // Default to true for exploration
     const SESSION_ID = {{ session.id }};
     const MY_CHARACTER_ID = {{ my_character.id if my_character else 'null' }};
+
+    // --- Combat Map ---
+    let combatPositions = {};
+    let mapCanvas = null;
+    let mapCtx = null;
+    let tokenImages = {};
+    const TOKEN_RADIUS = 24;
+    const MAP_BG_COLOR = '#2d5a1d';
+
+    function initCombatMap() {
+        mapCanvas = document.getElementById('combat-map');
+        if (!mapCanvas) return;
+        mapCtx = mapCanvas.getContext('2d');
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+    }
+
+    function resizeCanvas() {
+        if (!mapCanvas) return;
+        const container = document.getElementById('combat-map-container');
+        mapCanvas.width = container.clientWidth;
+        mapCanvas.height = container.clientHeight;
+        renderMap();
+    }
+
+    function renderMap() {
+        if (!mapCtx || !mapCanvas) return;
+        const w = mapCanvas.width;
+        const h = mapCanvas.height;
+
+        mapCtx.fillStyle = MAP_BG_COLOR;
+        mapCtx.fillRect(0, 0, w, h);
+
+        // Subtle grid
+        mapCtx.strokeStyle = 'rgba(255,255,255,0.05)';
+        mapCtx.lineWidth = 1;
+        for (let x = 0; x < w; x += 50) {
+            mapCtx.beginPath();
+            mapCtx.moveTo(x, 0);
+            mapCtx.lineTo(x, h);
+            mapCtx.stroke();
+        }
+        for (let y = 0; y < h; y += 50) {
+            mapCtx.beginPath();
+            mapCtx.moveTo(0, y);
+            mapCtx.lineTo(w, y);
+            mapCtx.stroke();
+        }
+
+        // Draw tokens
+        const scaleX = w / 800;
+        const scaleY = h / 600;
+        for (const [charId, pos] of Object.entries(combatPositions)) {
+            const x = pos.x * scaleX;
+            const y = pos.y * scaleY;
+            const isCurrent = (parseInt(charId) === currentTurnCharId);
+            drawToken(x, y, pos, parseInt(charId), isCurrent);
+        }
+    }
+
+    function drawToken(x, y, pos, charId, isCurrent) {
+        const r = TOKEN_RADIUS;
+
+        // Turn glow
+        if (isCurrent) {
+            mapCtx.save();
+            mapCtx.shadowColor = '#d4a843';
+            mapCtx.shadowBlur = 20;
+            mapCtx.beginPath();
+            mapCtx.arc(x, y, r + 4, 0, Math.PI * 2);
+            mapCtx.strokeStyle = '#d4a843';
+            mapCtx.lineWidth = 3;
+            mapCtx.stroke();
+            mapCtx.restore();
+        }
+
+        // Token border
+        mapCtx.beginPath();
+        mapCtx.arc(x, y, r + 2, 0, Math.PI * 2);
+        mapCtx.fillStyle = pos.is_enemy ? '#8b0000' : '#1a3a5c';
+        mapCtx.fill();
+
+        // Avatar image or fallback
+        const img = tokenImages[charId];
+        if (img && img.complete && img.naturalWidth > 0) {
+            mapCtx.save();
+            mapCtx.beginPath();
+            mapCtx.arc(x, y, r, 0, Math.PI * 2);
+            mapCtx.clip();
+            mapCtx.drawImage(img, x - r, y - r, r * 2, r * 2);
+            mapCtx.restore();
+        } else {
+            mapCtx.beginPath();
+            mapCtx.arc(x, y, r, 0, Math.PI * 2);
+            mapCtx.fillStyle = pos.is_enemy ? '#dc2626' : '#3b82f6';
+            mapCtx.fill();
+
+            mapCtx.fillStyle = '#ffffff';
+            mapCtx.font = 'bold 20px Georgia';
+            mapCtx.textAlign = 'center';
+            mapCtx.textBaseline = 'middle';
+            mapCtx.fillText(pos.name.charAt(0).toUpperCase(), x, y);
+        }
+
+        // Name label
+        mapCtx.fillStyle = '#ffffff';
+        mapCtx.font = '11px Georgia';
+        mapCtx.textAlign = 'center';
+        mapCtx.textBaseline = 'top';
+        mapCtx.fillText(pos.name, x, y + r + 6);
+    }
+
+    function loadTokenImages(positions) {
+        for (const [charId, pos] of Object.entries(positions)) {
+            if (pos.avatar_url && !tokenImages[charId]) {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => renderMap();
+                img.src = pos.avatar_url;
+                tokenImages[charId] = img;
+            }
+        }
+    }
+
+    function updateMapInitiativeOverlay(gs) {
+        const roundEl = document.getElementById('map-round-number');
+        const listEl = document.getElementById('map-initiative-list');
+        if (roundEl) roundEl.textContent = gs.round_number;
+        if (listEl && gs.initiative_order) {
+            listEl.innerHTML = gs.initiative_order.map(entry => {
+                const isCurrent = gs.current_turn_character_id === entry.character_id;
+                const nameClass = entry.is_enemy ? 'text-red-400' : 'gold-text';
+                return `<div class="flex items-center justify-between px-1 py-0.5 rounded ${isCurrent ? 'map-init-current' : ''}">
+                    ${isCurrent ? '<span class="text-yellow-400 text-xs">&#9654;</span>' : ''}
+                    <span class="${nameClass} text-xs font-bold">${entry.character_name}</span>
+                    <span class="text-gray-500 text-xs">${entry.initiative}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    function enterCombatLayout() {
+        const narrativePanel = document.getElementById('narrative-panel');
+        const mapContainer = document.getElementById('combat-map-container');
+
+        narrativePanel.style.width = '320px';
+        narrativePanel.style.minWidth = '320px';
+        narrativePanel.style.borderRight = '1px solid #3a3a5e';
+
+        mapContainer.classList.remove('hidden');
+
+        setTimeout(() => {
+            initCombatMap();
+            renderMap();
+        }, 50);
+    }
+
+    function exitCombatLayout() {
+        const narrativePanel = document.getElementById('narrative-panel');
+        const mapContainer = document.getElementById('combat-map-container');
+
+        narrativePanel.style.width = '100%';
+        narrativePanel.style.minWidth = '';
+        narrativePanel.style.borderRight = '';
+
+        mapContainer.classList.add('hidden');
+
+        tokenImages = {};
+        combatPositions = {};
+    }
 
     // --- Sidebar ---
     function toggleSidebar() {
@@ -642,9 +830,19 @@
                     `;
                 }).join('');
             }
+
+            // Combat map
+            if (gs.combat_positions && Object.keys(gs.combat_positions).length > 0) {
+                combatPositions = gs.combat_positions;
+                loadTokenImages(combatPositions);
+                enterCombatLayout();
+                renderMap();
+            }
+            updateMapInitiativeOverlay(gs);
         } else {
             if (tracker) tracker.classList.add('hidden');
             if (enemyPanel) enemyPanel.classList.add('hidden');
+            exitCombatLayout();
         }
     }
 

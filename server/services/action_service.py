@@ -44,6 +44,7 @@ def _build_char_states(characters):
             "is_enemy": c.is_enemy,
             "is_npc": c.is_npc,
             "player_id": c.player_id,
+            "avatar_url": c.avatar_url,
         }
         for c in characters
         if not (c.is_enemy and c.hp_current <= 0)
@@ -59,6 +60,7 @@ def _build_gs_info(game_state):
         "round_number": game_state.round_number,
         "current_turn_character_id": game_state.current_turn_character_id,
         "initiative_order": game_state.initiative_order or [],
+        "combat_positions": game_state.combat_positions or {},
     }
 
 

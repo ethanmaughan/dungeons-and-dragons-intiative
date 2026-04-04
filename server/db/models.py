@@ -126,6 +126,7 @@ class GameState(Base):
     active_effects: Mapped[dict | None] = mapped_column(JSON, default=list)
     creation_step: Mapped[str | None] = mapped_column(String(50), nullable=True)
     rolling_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    combat_positions: Mapped[dict | None] = mapped_column(JSON, default=dict)
 
     session: Mapped["Session"] = relationship(back_populates="game_state")
 

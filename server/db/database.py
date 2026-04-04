@@ -71,6 +71,8 @@ def _run_migrations():
         with engine.begin() as conn:
             if "rolling_summary" not in existing:
                 conn.execute(text("ALTER TABLE game_state ADD COLUMN rolling_summary TEXT"))
+            if "combat_positions" not in existing:
+                conn.execute(text("ALTER TABLE game_state ADD COLUMN combat_positions JSON"))
 
 
 def _backfill_invite_codes():

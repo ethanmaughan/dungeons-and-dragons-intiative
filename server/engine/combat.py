@@ -127,6 +127,35 @@ def roll_all_initiative(characters: list) -> list[dict]:
     return initiative_order
 
 
+def assign_combat_positions(all_combatants: list, canvas_width: int = 800, canvas_height: int = 600) -> dict:
+    """Auto-place combatants: PCs on the left, enemies on the right."""
+    pcs = [c for c in all_combatants if not c.is_enemy]
+    enemies = [c for c in all_combatants if c.is_enemy]
+    positions = {}
+
+    pc_spacing = canvas_height // (len(pcs) + 1) if pcs else canvas_height // 2
+    for i, c in enumerate(pcs):
+        positions[str(c.id)] = {
+            "x": 150,
+            "y": pc_spacing * (i + 1),
+            "avatar_url": c.avatar_url,
+            "name": c.character_name,
+            "is_enemy": False,
+        }
+
+    enemy_spacing = canvas_height // (len(enemies) + 1) if enemies else canvas_height // 2
+    for i, c in enumerate(enemies):
+        positions[str(c.id)] = {
+            "x": 650,
+            "y": enemy_spacing * (i + 1),
+            "avatar_url": c.avatar_url,
+            "name": c.character_name,
+            "is_enemy": True,
+        }
+
+    return positions
+
+
 def start_combat(enemy_names: list, characters: list, game_state, campaign_id: int, db) -> dict:
     """Start combat: create enemies, roll initiative, update game state."""
     # Guard: don't start combat if already in combat
@@ -151,6 +180,7 @@ def start_combat(enemy_names: list, characters: list, game_state, campaign_id: i
     game_state.initiative_order = initiative_order
     game_state.round_number = 1
     game_state.current_turn_character_id = initiative_order[0]["character_id"] if initiative_order else None
+    game_state.combat_positions = assign_combat_positions(all_combatants)
 
     # Build initiative summary for narration
     init_lines = []
@@ -170,6 +200,7 @@ def end_combat(game_state, characters, db):
     game_state.initiative_order = []
     game_state.round_number = 0
     game_state.current_turn_character_id = None
+    game_state.combat_positions = {}
 
     for c in characters:
         if c.is_enemy:
