@@ -74,6 +74,13 @@ def _run_migrations():
             if "combat_positions" not in existing:
                 conn.execute(text("ALTER TABLE game_state ADD COLUMN combat_positions JSON"))
 
+    # Character: add sprite_url for combat map sprites
+    if "characters" in inspector.get_table_names():
+        existing = {col["name"] for col in inspector.get_columns("characters")}
+        with engine.begin() as conn:
+            if "sprite_url" not in existing:
+                conn.execute(text("ALTER TABLE characters ADD COLUMN sprite_url VARCHAR(500)"))
+
 
 def _backfill_invite_codes():
     """Generate invite codes for existing campaigns that don't have one."""

@@ -6,6 +6,19 @@ from pathlib import Path
 from server.engine.dice import initiative_roll
 
 MONSTERS_FILE = Path(__file__).parent.parent.parent / "data" / "srd" / "monsters_basic.json"
+
+# Grid constants
+CELL_SIZE = 32       # pixels per grid cell
+FEET_PER_CELL = 5    # D&D: 1 cell = 5 feet
+GRID_COLS = 25       # 25 columns
+GRID_ROWS = 19       # 19 rows
+
+DIRECTION_DELTAS = {
+    "up": (0, -1),
+    "down": (0, 1),
+    "left": (-1, 0),
+    "right": (1, 0),
+}
 _monsters_cache = None
 
 
@@ -127,33 +140,141 @@ def roll_all_initiative(characters: list) -> list[dict]:
     return initiative_order
 
 
-def assign_combat_positions(all_combatants: list, canvas_width: int = 800, canvas_height: int = 600) -> dict:
-    """Auto-place combatants: PCs on the left, enemies on the right."""
+def assign_combat_positions(all_combatants: list) -> dict:
+    """Auto-place combatants on a grid: PCs on the left, enemies on the right."""
     pcs = [c for c in all_combatants if not c.is_enemy]
     enemies = [c for c in all_combatants if c.is_enemy]
     positions = {}
 
-    pc_spacing = canvas_height // (len(pcs) + 1) if pcs else canvas_height // 2
+    pc_spacing = GRID_ROWS // (len(pcs) + 1) if pcs else GRID_ROWS // 2
     for i, c in enumerate(pcs):
         positions[str(c.id)] = {
-            "x": 150,
-            "y": pc_spacing * (i + 1),
-            "avatar_url": c.avatar_url,
+            "col": 4,
+            "row": pc_spacing * (i + 1),
+            "sprite_url": c.sprite_url,
             "name": c.character_name,
             "is_enemy": False,
+            "speed": c.speed or 30,
+            "movement_remaining": c.speed or 30,
         }
 
-    enemy_spacing = canvas_height // (len(enemies) + 1) if enemies else canvas_height // 2
+    enemy_spacing = GRID_ROWS // (len(enemies) + 1) if enemies else GRID_ROWS // 2
     for i, c in enumerate(enemies):
         positions[str(c.id)] = {
-            "x": 650,
-            "y": enemy_spacing * (i + 1),
-            "avatar_url": c.avatar_url,
+            "col": 20,
+            "row": enemy_spacing * (i + 1),
+            "sprite_url": c.sprite_url,
             "name": c.character_name,
             "is_enemy": True,
+            "speed": c.speed or 30,
+            "movement_remaining": c.speed or 30,
         }
 
     return positions
+
+
+def validate_move(char_id: int, direction: str, positions: dict, game_state) -> tuple[bool, str]:
+    """Validate a movement request. Returns (ok, error_message)."""
+    key = str(char_id)
+    if key not in positions:
+        return False, "Character not in combat"
+
+    if game_state.current_turn_character_id != char_id:
+        return False, "Not your turn"
+
+    pos = positions[key]
+    if pos["movement_remaining"] < FEET_PER_CELL:
+        return False, "No movement remaining"
+
+    if direction not in DIRECTION_DELTAS:
+        return False, "Invalid direction"
+
+    dcol, drow = DIRECTION_DELTAS[direction]
+    new_col = pos["col"] + dcol
+    new_row = pos["row"] + drow
+
+    if not (0 <= new_col < GRID_COLS and 0 <= new_row < GRID_ROWS):
+        return False, "Out of bounds"
+
+    # Collision check
+    for cid, cpos in positions.items():
+        if cid != key and cpos["col"] == new_col and cpos["row"] == new_row:
+            return False, "Cell occupied"
+
+    return True, ""
+
+
+def execute_move(char_id: int, direction: str, positions: dict) -> dict:
+    """Execute a validated move. Mutates positions dict. Returns updated entry."""
+    key = str(char_id)
+    dcol, drow = DIRECTION_DELTAS[direction]
+    pos = positions[key]
+    pos["col"] += dcol
+    pos["row"] += drow
+    pos["movement_remaining"] -= FEET_PER_CELL
+    return pos
+
+
+def compute_enemy_movement(enemy_id: int, positions: dict) -> list[str]:
+    """Compute moves for an enemy toward the nearest PC. Returns list of directions."""
+    key = str(enemy_id)
+    if key not in positions:
+        return []
+
+    pos = positions[key]
+    ecol, erow = pos["col"], pos["row"]
+    remaining = pos["movement_remaining"]
+
+    # Find nearest alive PC
+    pcs = [(cid, p) for cid, p in positions.items() if not p["is_enemy"]]
+    if not pcs:
+        return []
+
+    nearest = min(pcs, key=lambda p: abs(p[1]["col"] - ecol) + abs(p[1]["row"] - erow))
+    tcol, trow = nearest[1]["col"], nearest[1]["row"]
+
+    moves = []
+    cur_col, cur_row = ecol, erow
+
+    while remaining >= FEET_PER_CELL:
+        # Stop if adjacent (within 1 cell = melee range)
+        if abs(cur_col - tcol) + abs(cur_row - trow) <= 1:
+            break
+
+        dcol = 1 if tcol > cur_col else (-1 if tcol < cur_col else 0)
+        drow = 1 if trow > cur_row else (-1 if trow < cur_row else 0)
+
+        # Prefer larger gap axis
+        if abs(tcol - cur_col) >= abs(trow - cur_row) and dcol != 0:
+            primary, fallback = ("right" if dcol > 0 else "left"), ("down" if drow > 0 else "up") if drow != 0 else None
+        elif drow != 0:
+            primary, fallback = ("down" if drow > 0 else "up"), ("right" if dcol > 0 else "left") if dcol != 0 else None
+        else:
+            break
+
+        # Check primary direction
+        d = DIRECTION_DELTAS[primary]
+        nc, nr = cur_col + d[0], cur_row + d[1]
+        occupied = any(p["col"] == nc and p["row"] == nr for cid, p in positions.items() if cid != key)
+
+        if 0 <= nc < GRID_COLS and 0 <= nr < GRID_ROWS and not occupied:
+            moves.append(primary)
+            cur_col, cur_row = nc, nr
+            remaining -= FEET_PER_CELL
+        elif fallback:
+            d = DIRECTION_DELTAS[fallback]
+            nc, nr = cur_col + d[0], cur_row + d[1]
+            occupied = any(p["col"] == nc and p["row"] == nr for cid, p in positions.items() if cid != key)
+            if 0 <= nc < GRID_COLS and 0 <= nr < GRID_ROWS and not occupied:
+                moves.append(fallback)
+                cur_col, cur_row = nc, nr
+                remaining -= FEET_PER_CELL
+            else:
+                break
+        else:
+            break
+
+    return moves
 
 
 def start_combat(enemy_names: list, characters: list, game_state, campaign_id: int, db) -> dict:
@@ -237,6 +358,13 @@ def advance_turn(game_state) -> dict | None:
 
     next_entry = order[next_idx]
     game_state.current_turn_character_id = next_entry["character_id"]
+
+    # Reset movement for the new turn's character
+    next_key = str(next_entry["character_id"])
+    if game_state.combat_positions and next_key in game_state.combat_positions:
+        positions = dict(game_state.combat_positions)
+        positions[next_key]["movement_remaining"] = positions[next_key].get("speed", 30)
+        game_state.combat_positions = positions
 
     return next_entry
 

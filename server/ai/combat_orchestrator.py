@@ -194,20 +194,41 @@ async def _resolve_current_enemy(game_state, characters: list) -> dict | None:
     if not enemy or enemy.hp_current <= 0 or not enemy.is_enemy:
         return None
 
+    # Move enemy on grid before attacking
+    move_narration = ""
+    try:
+        from server.engine.combat import compute_enemy_movement, execute_move
+        if game_state.combat_positions:
+            positions = dict(game_state.combat_positions)
+            moves = compute_enemy_movement(enemy.id, positions)
+            for direction in moves:
+                execute_move(enemy.id, direction, positions)
+            game_state.combat_positions = positions
+            if moves:
+                move_narration = f"{enemy.character_name} moves {len(moves) * 5} feet closer. "
+    except Exception:
+        traceback.print_exc()
+
     try:
         decision = await get_enemy_decision(enemy, characters)
-        return _execute_enemy_action(enemy, decision, characters)
+        result = _execute_enemy_action(enemy, decision, characters)
+        if move_narration:
+            result["narration"] = move_narration + result["narration"]
+        return result
     except Exception:
         traceback.print_exc()
         # Fallback: if the agent fails, do a basic attack so the turn isn't stuck
         from server.ai.enemy_agent import _rule_decision
         try:
             decision = _rule_decision(enemy, characters)
-            return _execute_enemy_action(enemy, decision, characters)
+            result = _execute_enemy_action(enemy, decision, characters)
+            if move_narration:
+                result["narration"] = move_narration + result["narration"]
+            return result
         except Exception:
             traceback.print_exc()
             return {
-                "narration": f"\n{enemy.character_name} hesitates, unsure what to do.",
+                "narration": f"\n{move_narration}{enemy.character_name} hesitates, unsure what to do.",
                 "dice_rolls": [],
                 "state_changes": {},
                 "actor": enemy.character_name,

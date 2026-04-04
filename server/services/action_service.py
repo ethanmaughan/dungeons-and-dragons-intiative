@@ -45,6 +45,8 @@ def _build_char_states(characters):
             "is_npc": c.is_npc,
             "player_id": c.player_id,
             "avatar_url": c.avatar_url,
+            "sprite_url": c.sprite_url,
+            "speed": c.speed,
         }
         for c in characters
         if not (c.is_enemy and c.hp_current <= 0)

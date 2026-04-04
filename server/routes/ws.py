@@ -6,11 +6,12 @@ import traceback
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session as DBSession
 
-from server.db.database import get_db
-from server.db.models import Character, Player
+from server.db.database import get_db, SessionLocal
+from server.db.models import Character, GameState, Player
 from server.db.models import Session as GameSession
 from server.ws.manager import manager
 from server.services.action_service import process_action
+from server.engine.combat import validate_move, execute_move
 from fastapi.templating import Jinja2Templates
 
 templates = Jinja2Templates(directory="templates")
@@ -39,8 +40,6 @@ async def websocket_session(ws: WebSocket, session_id: int):
     # needs the connection to be accepted to read cookies)
     # Actually, we need to get DB and player before accepting
     # Use manual DB session since WebSocket can't use Depends the same way
-    from server.db.database import SessionLocal
-
     db = SessionLocal()
     try:
         # Accept first so session middleware can process cookies
@@ -182,6 +181,50 @@ async def websocket_session(ws: WebSocket, session_id: int):
                     await ws.send_text(json.dumps({
                         "type": "error",
                         "message": "Failed to process action",
+                    }))
+
+            elif data.get("type") == "move":
+                direction = data.get("direction", "")
+                if direction not in ("up", "down", "left", "right"):
+                    continue
+                if not my_character:
+                    continue
+
+                db.close()
+                db = SessionLocal()
+
+                try:
+                    game_state = db.query(GameState).filter(
+                        GameState.session_id == session_id
+                    ).first()
+
+                    if not game_state or game_state.game_mode != "combat":
+                        continue
+
+                    positions = dict(game_state.combat_positions or {})
+                    ok, err = validate_move(my_character.id, direction, positions, game_state)
+
+                    if not ok:
+                        await ws.send_text(json.dumps({
+                            "type": "move_rejected",
+                            "message": err,
+                        }))
+                        continue
+
+                    execute_move(my_character.id, direction, positions)
+                    game_state.combat_positions = positions
+                    db.commit()
+
+                    await manager.broadcast(session_id, {
+                        "type": "position_update",
+                        "combat_positions": positions,
+                    })
+
+                except Exception:
+                    traceback.print_exc()
+                    await ws.send_text(json.dumps({
+                        "type": "error",
+                        "message": "Move failed",
                     }))
 
             elif data.get("type") == "ping":

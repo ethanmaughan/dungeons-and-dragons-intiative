@@ -301,11 +301,22 @@
         </div>
 
         <!-- Combat Map (hidden until combat mode) -->
-        <div id="combat-map-container" class="hidden flex-1 relative" style="min-width: 0;">
+        <div id="combat-map-container" class="hidden flex-1 relative" style="min-width: 0;" tabindex="0">
             <canvas id="combat-map" class="w-full h-full"></canvas>
             <div id="map-initiative-overlay" class="absolute top-3 right-3 parchment rounded-lg p-3 w-48 opacity-90">
                 <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-2">Round <span id="map-round-number">1</span></h3>
                 <div id="map-initiative-list" class="space-y-1 text-sm"></div>
+            </div>
+            <div id="speed-tracker" class="absolute bottom-3 left-3 parchment rounded-lg p-3 opacity-90 hidden">
+                <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Movement</div>
+                <div class="flex items-center gap-2">
+                    <div class="text-lg font-bold gold-text" id="speed-remaining">30</div>
+                    <div class="text-sm text-gray-400">/ <span id="speed-total">30</span> ft</div>
+                </div>
+                <div class="mt-1 bg-gray-800 rounded-full h-2 overflow-hidden" style="width: 120px;">
+                    <div class="h-full rounded-full bg-yellow-600" id="speed-bar" style="width: 100%;"></div>
+                </div>
+                <div class="text-xs text-gray-500 mt-1">Arrow keys to move</div>
             </div>
         </div>
     </div>
@@ -352,8 +363,15 @@
     let mapCanvas = null;
     let mapCtx = null;
     let tokenImages = {};
-    const TOKEN_RADIUS = 24;
+    const CELL_SIZE = 32;
+    const FEET_PER_CELL = 5;
+    const GRID_COLS = 25;
+    const GRID_ROWS = 19;
     const MAP_BG_COLOR = '#2d5a1d';
+    let myMovementRemaining = 0;
+    let mySpeed = 30;
+    let gridOffsetX = 0;
+    let gridOffsetY = 0;
 
     function initCombatMap() {
         mapCanvas = document.getElementById('combat-map');
@@ -368,6 +386,8 @@
         const container = document.getElementById('combat-map-container');
         mapCanvas.width = container.clientWidth;
         mapCanvas.height = container.clientHeight;
+        gridOffsetX = Math.floor((mapCanvas.width - GRID_COLS * CELL_SIZE) / 2);
+        gridOffsetY = Math.floor((mapCanvas.height - GRID_ROWS * CELL_SIZE) / 2);
         renderMap();
     }
 
@@ -376,95 +396,88 @@
         const w = mapCanvas.width;
         const h = mapCanvas.height;
 
+        // Background
         mapCtx.fillStyle = MAP_BG_COLOR;
         mapCtx.fillRect(0, 0, w, h);
 
-        // Subtle grid
-        mapCtx.strokeStyle = 'rgba(255,255,255,0.05)';
+        // Draw grid cells
+        mapCtx.strokeStyle = 'rgba(255,255,255,0.08)';
         mapCtx.lineWidth = 1;
-        for (let x = 0; x < w; x += 50) {
+        for (let col = 0; col <= GRID_COLS; col++) {
+            const x = gridOffsetX + col * CELL_SIZE;
             mapCtx.beginPath();
-            mapCtx.moveTo(x, 0);
-            mapCtx.lineTo(x, h);
+            mapCtx.moveTo(x, gridOffsetY);
+            mapCtx.lineTo(x, gridOffsetY + GRID_ROWS * CELL_SIZE);
             mapCtx.stroke();
         }
-        for (let y = 0; y < h; y += 50) {
+        for (let row = 0; row <= GRID_ROWS; row++) {
+            const y = gridOffsetY + row * CELL_SIZE;
             mapCtx.beginPath();
-            mapCtx.moveTo(0, y);
-            mapCtx.lineTo(w, y);
+            mapCtx.moveTo(gridOffsetX, y);
+            mapCtx.lineTo(gridOffsetX + GRID_COLS * CELL_SIZE, y);
             mapCtx.stroke();
         }
 
         // Draw tokens
-        const scaleX = w / 800;
-        const scaleY = h / 600;
         for (const [charId, pos] of Object.entries(combatPositions)) {
-            const x = pos.x * scaleX;
-            const y = pos.y * scaleY;
+            const px = gridOffsetX + pos.col * CELL_SIZE;
+            const py = gridOffsetY + pos.row * CELL_SIZE;
             const isCurrent = (parseInt(charId) === currentTurnCharId);
-            drawToken(x, y, pos, parseInt(charId), isCurrent);
+            drawToken(px, py, pos, parseInt(charId), isCurrent);
         }
     }
 
-    function drawToken(x, y, pos, charId, isCurrent) {
-        const r = TOKEN_RADIUS;
+    function drawToken(px, py, pos, charId, isCurrent) {
+        const s = CELL_SIZE;
 
         // Turn glow
         if (isCurrent) {
             mapCtx.save();
             mapCtx.shadowColor = '#d4a843';
-            mapCtx.shadowBlur = 20;
-            mapCtx.beginPath();
-            mapCtx.arc(x, y, r + 4, 0, Math.PI * 2);
+            mapCtx.shadowBlur = 15;
             mapCtx.strokeStyle = '#d4a843';
-            mapCtx.lineWidth = 3;
-            mapCtx.stroke();
+            mapCtx.lineWidth = 2;
+            mapCtx.strokeRect(px - 2, py - 2, s + 4, s + 4);
             mapCtx.restore();
         }
 
-        // Token border
-        mapCtx.beginPath();
-        mapCtx.arc(x, y, r + 2, 0, Math.PI * 2);
+        // Token border (1px colored border around cell)
         mapCtx.fillStyle = pos.is_enemy ? '#8b0000' : '#1a3a5c';
-        mapCtx.fill();
+        mapCtx.fillRect(px, py, s, s);
 
-        // Avatar image or fallback
+        // Sprite image or fallback
         const img = tokenImages[charId];
         if (img && img.complete && img.naturalWidth > 0) {
-            mapCtx.save();
-            mapCtx.beginPath();
-            mapCtx.arc(x, y, r, 0, Math.PI * 2);
-            mapCtx.clip();
-            mapCtx.drawImage(img, x - r, y - r, r * 2, r * 2);
-            mapCtx.restore();
+            // Draw sprite at exact 32x32
+            mapCtx.drawImage(img, px, py, s, s);
         } else {
-            mapCtx.beginPath();
-            mapCtx.arc(x, y, r, 0, Math.PI * 2);
+            // Colored square with initial
             mapCtx.fillStyle = pos.is_enemy ? '#dc2626' : '#3b82f6';
-            mapCtx.fill();
+            mapCtx.fillRect(px + 2, py + 2, s - 4, s - 4);
 
             mapCtx.fillStyle = '#ffffff';
-            mapCtx.font = 'bold 20px Georgia';
+            mapCtx.font = 'bold 16px Georgia';
             mapCtx.textAlign = 'center';
             mapCtx.textBaseline = 'middle';
-            mapCtx.fillText(pos.name.charAt(0).toUpperCase(), x, y);
+            mapCtx.fillText(pos.name.charAt(0).toUpperCase(), px + s / 2, py + s / 2);
         }
 
-        // Name label
+        // Name label below cell
         mapCtx.fillStyle = '#ffffff';
-        mapCtx.font = '11px Georgia';
+        mapCtx.font = '10px Georgia';
         mapCtx.textAlign = 'center';
         mapCtx.textBaseline = 'top';
-        mapCtx.fillText(pos.name, x, y + r + 6);
+        mapCtx.fillText(pos.name, px + s / 2, py + s + 2);
     }
 
     function loadTokenImages(positions) {
         for (const [charId, pos] of Object.entries(positions)) {
-            if (pos.avatar_url && !tokenImages[charId]) {
+            const url = pos.sprite_url;
+            if (url && !tokenImages[charId]) {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
                 img.onload = () => renderMap();
-                img.src = pos.avatar_url;
+                img.src = url;
                 tokenImages[charId] = img;
             }
         }
@@ -484,6 +497,20 @@
                     <span class="text-gray-500 text-xs">${entry.initiative}</span>
                 </div>`;
             }).join('');
+        }
+    }
+
+    function updateSpeedTracker() {
+        const tracker = document.getElementById('speed-tracker');
+        if (!tracker) return;
+        if (currentGameMode === 'combat' && isMyTurn) {
+            tracker.classList.remove('hidden');
+            document.getElementById('speed-remaining').textContent = myMovementRemaining;
+            document.getElementById('speed-total').textContent = mySpeed;
+            const pct = mySpeed > 0 ? (myMovementRemaining / mySpeed * 100) : 0;
+            document.getElementById('speed-bar').style.width = pct + '%';
+        } else {
+            tracker.classList.add('hidden');
         }
     }
 
@@ -515,6 +542,7 @@
 
         tokenImages = {};
         combatPositions = {};
+        document.getElementById('speed-tracker').classList.add('hidden');
     }
 
     // --- Sidebar ---
@@ -614,6 +642,20 @@
                 showNotification(data.message, true);
                 actionPending = false;
                 updateSendButton();
+                break;
+
+            case 'position_update':
+                combatPositions = data.combat_positions;
+                if (MY_CHARACTER_ID && data.combat_positions[String(MY_CHARACTER_ID)]) {
+                    myMovementRemaining = data.combat_positions[String(MY_CHARACTER_ID)].movement_remaining;
+                    mySpeed = data.combat_positions[String(MY_CHARACTER_ID)].speed;
+                    updateSpeedTracker();
+                }
+                renderMap();
+                break;
+
+            case 'move_rejected':
+                // Brief flash — don't spam notifications for boundary hits
                 break;
 
             case 'pong':
@@ -836,6 +878,12 @@
                 combatPositions = gs.combat_positions;
                 loadTokenImages(combatPositions);
                 enterCombatLayout();
+                // Extract local player movement data
+                if (MY_CHARACTER_ID && gs.combat_positions[String(MY_CHARACTER_ID)]) {
+                    myMovementRemaining = gs.combat_positions[String(MY_CHARACTER_ID)].movement_remaining;
+                    mySpeed = gs.combat_positions[String(MY_CHARACTER_ID)].speed;
+                }
+                updateSpeedTracker();
                 renderMap();
             }
             updateMapInitiativeOverlay(gs);
@@ -961,6 +1009,33 @@
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && sidebarOpen) {
             toggleSidebar();
+            return;
+        }
+
+        // Arrow key movement during combat
+        if (currentGameMode !== 'combat') return;
+        if (!isMyTurn) return;
+        // Don't capture arrow keys when typing in the action input
+        if (document.activeElement === document.getElementById('action-input')) return;
+
+        const dirMap = {
+            'ArrowUp': 'up',
+            'ArrowDown': 'down',
+            'ArrowLeft': 'left',
+            'ArrowRight': 'right',
+        };
+        const direction = dirMap[e.key];
+        if (!direction) return;
+
+        e.preventDefault();
+
+        if (myMovementRemaining < FEET_PER_CELL) return;
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'move',
+                direction: direction,
+            }));
         }
     });
 </script>
