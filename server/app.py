@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -20,6 +21,10 @@ from server.routes.admin import router as admin_router
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Foray", version="1.0.0")
+
+    @app.get("/healthz")
+    def health_check():
+        return JSONResponse({"status": "ok"})
 
     # Middleware (outermost first)
     app.add_middleware(SecurityHeadersMiddleware)
