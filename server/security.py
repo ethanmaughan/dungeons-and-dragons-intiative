@@ -41,7 +41,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline'; "
             "frame-src https://js.stripe.com; "
             "connect-src 'self' wss: ws:; "
-            "img-src 'self' data: https:; "
+            "img-src 'self' data: https:"
         )
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
         return response
