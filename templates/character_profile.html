@@ -2,186 +2,424 @@
 
 {% block title %}{{ character.character_name }} — Foray{% endblock %}
 
+{% block head %}
+<style>
+  :root {
+    --theme-primary:     {{ theme.primary }};
+    --theme-secondary:   {{ theme.secondary }};
+    --theme-accent:      {{ theme.accent }};
+    --theme-glow:        {{ theme.glow }};
+    --theme-glow-strong: {{ theme.glow_strong }};
+  }
+  .avatar-ring {
+    box-shadow: 0 0 0 3px var(--theme-primary), 0 0 20px var(--theme-glow), 0 0 40px var(--theme-glow);
+    border: 3px solid var(--theme-primary);
+  }
+  .ability-card { transition: all 0.2s; border: 1px solid #3a3a5e; }
+  .ability-card:hover {
+    box-shadow: 0 0 12px var(--theme-glow-strong);
+    border-color: var(--theme-primary);
+  }
+  .section-rule { border-color: var(--theme-secondary); opacity: 0.4; }
+  .stat-badge {
+    border: 1px solid var(--theme-primary);
+    background: rgba(0,0,0,0.4);
+  }
+  .tag-chip {
+    border: 1px solid var(--theme-primary);
+    color: var(--theme-primary);
+    background: rgba(0,0,0,0.3);
+  }
+  #edit-toggle-btn {
+    border: 1px solid var(--theme-primary);
+    color: var(--theme-primary);
+    transition: all 0.2s;
+  }
+  #edit-toggle-btn:hover { background: var(--theme-primary); color: #0e0e18; }
+  .parchment-textarea {
+    background: #1e1e32;
+    border: 1px solid #3a3a5e;
+    color: #e0d5c0;
+    resize: vertical;
+    font-family: Georgia, serif;
+  }
+  .parchment-textarea:focus {
+    border-color: var(--theme-primary);
+    outline: none;
+    box-shadow: 0 0 0 2px var(--theme-glow);
+  }
+  #edit-panel { background: rgba(10,10,20,0.95); }
+  #edit-panel-inner {
+    background: #16162a;
+    border: {{ theme.border_style }};
+  }
+  .tag-check:checked + .tag-label {
+    border-color: var(--theme-primary);
+    color: var(--theme-primary);
+    background: rgba(0,0,0,0.4);
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 py-8">
-    <a href="/dashboard" class="text-gray-400 hover:text-white text-sm mb-4 inline-block">&larr; Back to Dashboard</a>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Left: Avatar & Identity -->
-        <div class="parchment rounded-lg p-6 text-center">
-            {% if character.avatar_url %}
-            <img src="{{ character.avatar_url }}" alt="{{ character.character_name }}"
-                 class="w-40 h-40 rounded-full object-cover mx-auto border-2 border-yellow-700 mb-4">
-            {% else %}
-            <div class="w-40 h-40 rounded-full bg-gray-700 flex items-center justify-center text-6xl gold-text mx-auto mb-4 border-2 border-yellow-700">
-                {{ character.character_name[0] }}
-            </div>
-            {% endif %}
+<!-- HERO BANNER -->
+<div style="background: {{ theme.gradient }};" class="border-b border-gray-800 px-10 py-10">
+  <div class="max-w-5xl mx-auto">
+    <a href="/dashboard" class="text-gray-500 hover:text-gray-300 text-sm mb-6 inline-block">&larr; Dashboard</a>
 
-            <h1 class="text-2xl gold-text font-bold">{{ character.character_name }}</h1>
-            <p class="text-gray-400">{{ character.race }} {{ character.char_class }}</p>
-            <p class="text-gray-500 text-sm">Level {{ character.level }}</p>
-
-            <!-- Avatar Upload -->
-            <div class="mt-4 border-t border-gray-700 pt-4">
-                <form action="/api/character/{{ character.id }}/avatar" method="post" enctype="multipart/form-data" class="space-y-2">
-                    <label class="block text-xs text-gray-500">Upload Avatar</label>
-                    <input type="file" name="avatar_file" accept="image/*"
-                           class="text-xs text-gray-400 w-full">
-                    <div class="text-xs text-gray-600 my-1">— or —</div>
-                    <input type="text" name="avatar_url" placeholder="Paste image URL"
-                           class="action-input w-full rounded px-2 py-1 text-xs"
-                           value="{{ character.avatar_url or '' }}">
-                    <button type="submit" class="btn-secondary w-full rounded py-1 text-xs mt-1">
-                        Save Avatar
-                    </button>
-                </form>
-            </div>
+    <div class="flex items-center gap-10">
+      <!-- Avatar -->
+      <div class="relative flex-shrink-0">
+        {% if character.avatar_url %}
+        <img src="{{ character.avatar_url }}" alt="{{ character.character_name }}"
+             class="w-36 h-36 rounded-full object-cover avatar-ring">
+        {% else %}
+        <div class="w-36 h-36 rounded-full bg-gray-800 flex items-center justify-center avatar-ring"
+             style="font-size: 3.5rem; color: var(--theme-accent);">
+          {{ character.character_name[0] }}
         </div>
-
-        <!-- Middle: Stats -->
-        <div class="parchment rounded-lg p-6">
-            <h2 class="gold-text font-bold mb-4">Combat Stats</h2>
-            <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="text-center parchment rounded p-2">
-                    <div class="text-2xl font-bold text-red-400">{{ character.hp_current }}/{{ character.hp_max }}</div>
-                    <div class="text-xs text-gray-500">Hit Points</div>
-                </div>
-                <div class="text-center parchment rounded p-2">
-                    <div class="text-2xl font-bold gold-text">{{ character.ac }}</div>
-                    <div class="text-xs text-gray-500">Armor Class</div>
-                </div>
-                <div class="text-center parchment rounded p-2">
-                    <div class="text-2xl font-bold text-blue-400">+{{ character.proficiency_bonus }}</div>
-                    <div class="text-xs text-gray-500">Proficiency</div>
-                </div>
-                <div class="text-center parchment rounded p-2">
-                    <div class="text-2xl font-bold text-green-400">{{ character.speed }} ft</div>
-                    <div class="text-xs text-gray-500">Speed</div>
-                </div>
-                <div class="text-center parchment rounded p-2">
-                    <div class="text-2xl font-bold text-purple-400">{{ character.xp }}</div>
-                    <div class="text-xs text-gray-500">XP</div>
-                </div>
-                <div class="text-center parchment rounded p-2">
-                    <div class="text-2xl font-bold text-yellow-400">{{ character.level }}</div>
-                    <div class="text-xs text-gray-500">Level</div>
-                </div>
-            </div>
-
-            <h2 class="gold-text font-bold mb-3">Ability Scores</h2>
-            <div class="grid grid-cols-3 gap-2">
-                {% set abilities = [
-                    ("STR", character.str_score),
-                    ("DEX", character.dex_score),
-                    ("CON", character.con_score),
-                    ("INT", character.int_score),
-                    ("WIS", character.wis_score),
-                    ("CHA", character.cha_score)
-                ] %}
-                {% for name, score in abilities %}
-                <div class="text-center parchment rounded p-2">
-                    <div class="text-xs text-gray-500">{{ name }}</div>
-                    <div class="text-xl font-bold">{{ score }}</div>
-                    <div class="text-xs gold-text">
-                        {% set mod = (score - 10) // 2 %}
-                        {% if mod >= 0 %}+{% endif %}{{ mod }}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            {% if character.conditions %}
-            <h2 class="gold-text font-bold mt-4 mb-2">Conditions</h2>
-            <div class="flex flex-wrap gap-1">
-                {% for condition in character.conditions %}
-                <span class="bg-red-900/50 text-red-300 text-xs px-2 py-1 rounded">{{ condition }}</span>
-                {% endfor %}
-            </div>
-            {% endif %}
+        {% endif %}
+        <div class="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-lg"
+             style="border: {{ theme.border_style }}; color: var(--theme-accent);">
+          {{ theme.icon }}
         </div>
+      </div>
 
-        <!-- Right: Inventory & Info -->
-        <div class="parchment rounded-lg p-6">
-            <h2 class="gold-text font-bold mb-3">Inventory</h2>
-            {% if character.inventory %}
-            <ul class="space-y-1 text-sm">
-                {% for item in character.inventory %}
-                <li class="text-gray-300 border-b border-gray-700 pb-1">{{ item }}</li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p class="text-gray-500 text-sm italic">Empty pack</p>
-            {% endif %}
+      <!-- Identity -->
+      <div class="flex-1">
+        {% if character.title %}
+        <p class="text-sm tracking-widest uppercase mb-1" style="color: var(--theme-accent);">
+          {{ character.title }}
+        </p>
+        {% endif %}
 
-            {% if character.spells %}
-            <h2 class="gold-text font-bold mt-6 mb-3">Spells</h2>
-            <ul class="space-y-1 text-sm">
-                {% for spell in character.spells %}
-                <li class="text-purple-300 border-b border-gray-700 pb-1">{{ spell }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
+        <h1 class="text-4xl font-bold" style="color: var(--theme-accent); text-shadow: 0 0 20px var(--theme-glow);">
+          {{ character.character_name }}
+        </h1>
 
-            {% if character.features %}
-            <h2 class="gold-text font-bold mt-6 mb-3">Features</h2>
-            <ul class="space-y-1 text-sm">
-                {% for feature in character.features %}
-                <li class="text-gray-300 border-b border-gray-700 pb-1">{{ feature }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
+        <p class="mt-1 text-gray-400 text-lg tracking-wide">
+          {{ character.race }} &middot; {{ character.char_class }} &middot; Level {{ character.level }}
+        </p>
 
-            {% if character.spell_slots %}
-            <h2 class="gold-text font-bold mt-6 mb-3">Spell Slots</h2>
-            <div class="space-y-1 text-sm">
-                {% for level, max_slots in character.spell_slots.items() %}
-                {% set current = character.spell_slots_current.get(level, 0) if character.spell_slots_current else 0 %}
-                <div class="flex justify-between text-gray-300">
-                    <span>Level {{ level }}</span>
-                    <span class="{% if current == 0 %}text-red-400{% else %}text-blue-400{% endif %}">{{ current }}/{{ max_slots }}</span>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
+        {% if character.motto %}
+        <p class="mt-3 italic text-gray-300 text-lg max-w-xl"
+           style="border-left: 3px solid var(--theme-primary); padding-left: 1rem;">
+          "{{ character.motto }}"
+        </p>
+        {% endif %}
 
-            <h2 class="gold-text font-bold mt-6 mb-3">Campaign</h2>
-            {% if character.campaign %}
-            <p class="text-gray-300 text-sm">{{ character.campaign.name }}</p>
-            {% else %}
-            <p class="text-yellow-500 text-sm">Unassigned</p>
-            {% if available_campaigns %}
-            <form action="/api/characters/{{ character.id }}/assign" method="post" class="mt-2">
-                <select name="campaign_id" class="action-input rounded px-2 py-1 text-sm w-full mb-2">
-                    {% for camp in available_campaigns %}
-                    <option value="{{ camp.id }}">{{ camp.name }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn-action rounded px-3 py-1 text-sm w-full">Assign to Campaign</button>
-            </form>
-            {% endif %}
-            {% endif %}
-        </div>
+        <p class="mt-2 text-xs tracking-widest uppercase" style="color: var(--theme-primary);">
+          {{ theme.flavor }}
+        </p>
+      </div>
+
+      <!-- Edit button -->
+      {% if is_owner %}
+      <button id="edit-toggle-btn" onclick="toggleEdit()"
+              class="self-start px-4 py-2 rounded text-sm font-bold">
+        Edit Sheet
+      </button>
+      {% endif %}
     </div>
-
-    <!-- Session History -->
-    {% if sessions %}
-    <div class="parchment rounded-lg p-6 mt-6">
-        <h2 class="gold-text font-bold mb-4">Session History</h2>
-        <div class="space-y-2">
-            {% for session in sessions %}
-            <div class="flex items-center justify-between border-b border-gray-700 pb-2">
-                <div>
-                    <span class="text-gray-300">Session {{ session.session_number }}</span>
-                    <span class="text-gray-500 text-sm ml-2">{{ session.status | capitalize }}</span>
-                </div>
-                {% if session.status == 'active' %}
-                <a href="/play/{{ session.id }}" class="btn-action rounded px-3 py-1 text-sm">Resume</a>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
+  </div>
 </div>
+
+<!-- COMBAT STATS -->
+<div class="max-w-5xl mx-auto px-10 py-6">
+  <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Combat</h2>
+  <div class="flex gap-4 flex-wrap">
+    {% set combat_stats = [
+      ("HP", character.hp_current ~ "/" ~ character.hp_max, "#e87070"),
+      ("AC", character.ac, "var(--theme-accent)"),
+      ("Speed", character.speed ~ " ft", "#70c870"),
+      ("Prof.", "+" ~ character.proficiency_bonus, "#7090e8"),
+      ("XP", character.xp, "#c890e8"),
+      ("Level", character.level, "var(--theme-primary)"),
+    ] %}
+    {% for label, value, color in combat_stats %}
+    <div class="stat-badge rounded-lg px-6 py-4 text-center min-w-[90px]">
+      <div class="text-2xl font-bold" style="color: {{ color }}; font-family: monospace;">{{ value }}</div>
+      <div class="text-xs text-gray-500 mt-1 tracking-wide uppercase">{{ label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ABILITY SCORES -->
+<div class="max-w-5xl mx-auto px-10 py-6 border-t section-rule">
+  <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Abilities</h2>
+  <div class="grid grid-cols-6 gap-3">
+    {% set abilities = [
+      ("STR", character.str_score),
+      ("DEX", character.dex_score),
+      ("CON", character.con_score),
+      ("INT", character.int_score),
+      ("WIS", character.wis_score),
+      ("CHA", character.cha_score),
+    ] %}
+    {% for abbr, score in abilities %}
+    {% set mod = (score - 10) // 2 %}
+    <div class="ability-card parchment rounded-lg p-4 text-center cursor-default">
+      <div class="text-xs tracking-widest uppercase text-gray-500 mb-2">{{ abbr }}</div>
+      <div class="text-3xl font-bold text-white" style="font-family: monospace;">{{ score }}</div>
+      <div class="text-sm font-bold mt-1" style="color: var(--theme-primary);">
+        {% if mod >= 0 %}+{% endif %}{{ mod }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- CONDITIONS -->
+{% if character.conditions %}
+<div class="max-w-5xl mx-auto px-10 py-4">
+  <h2 class="text-xs tracking-widest uppercase mb-3" style="color: var(--theme-primary);">Conditions</h2>
+  <div class="flex flex-wrap gap-2">
+    {% for cond in character.conditions %}
+    <span class="px-3 py-1 rounded text-sm bg-red-900/40 text-red-300 border border-red-800">{{ cond }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- PERSONALITY TAGS -->
+{% if character.personality_tags %}
+<div class="max-w-5xl mx-auto px-10 py-6 border-t section-rule">
+  <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Personality</h2>
+  <div class="flex flex-wrap gap-2">
+    {% for tag in character.personality_tags %}
+    <span class="tag-chip px-3 py-1 rounded-full text-sm font-medium">{{ tag }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- BACKSTORY -->
+<div class="max-w-5xl mx-auto px-10 py-6 border-t section-rule">
+  <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Backstory</h2>
+  <div class="parchment rounded-lg p-6">
+    {% if character.backstory %}
+    <p class="text-gray-300 leading-relaxed narrative-text whitespace-pre-wrap">{{ character.backstory }}</p>
+    {% else %}
+    <p class="text-gray-600 italic text-sm">No history written yet. Click "Edit Sheet" to add your backstory.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- CHARACTER GOALS -->
+<div class="max-w-5xl mx-auto px-10 py-6 border-t section-rule">
+  <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Goals</h2>
+  <div class="parchment rounded-lg p-6">
+    {% if character.character_goals %}
+    <p class="text-gray-300 leading-relaxed narrative-text whitespace-pre-wrap">{{ character.character_goals }}</p>
+    {% else %}
+    <p class="text-gray-600 italic text-sm">No goals set yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- INVENTORY / SPELLS / FEATURES -->
+<div class="max-w-5xl mx-auto px-10 py-6 border-t section-rule">
+  <div class="grid grid-cols-3 gap-6">
+
+    <!-- Inventory -->
+    <div class="parchment rounded-lg p-5" style="border-left: 4px solid var(--theme-primary);">
+      <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Inventory</h2>
+      {% if character.inventory %}
+      <ul class="space-y-2">
+        {% for item in character.inventory %}
+        <li class="text-sm text-gray-300 flex items-center gap-2">
+          <span style="color: var(--theme-primary);">&rsaquo;</span> {{ item }}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-gray-600 italic text-sm">Empty pack.</p>
+      {% endif %}
+    </div>
+
+    <!-- Spells -->
+    <div class="parchment rounded-lg p-5" style="border-left: 4px solid var(--theme-primary);">
+      <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Spells</h2>
+      {% if character.spells %}
+      <ul class="space-y-2">
+        {% for spell in character.spells %}
+        <li class="text-sm flex items-center gap-2" style="color: var(--theme-accent);">
+          <span style="color: var(--theme-primary);">&#10022;</span> {{ spell }}
+        </li>
+        {% endfor %}
+      </ul>
+      {% if character.spell_slots %}
+      <div class="mt-4 pt-4 border-t border-gray-700">
+        <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Spell Slots</p>
+        {% for lvl, max_slots in character.spell_slots.items() %}
+        {% set current = character.spell_slots_current.get(lvl, 0) if character.spell_slots_current else 0 %}
+        <div class="flex justify-between text-sm mb-1">
+          <span class="text-gray-400">Level {{ lvl }}</span>
+          <span class="{% if current == 0 %}text-red-400{% endif %}"
+                style="{% if current > 0 %}color: var(--theme-primary); font-family: monospace;{% endif %}">
+            {{ current }}/{{ max_slots }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% else %}
+      <p class="text-gray-600 italic text-sm">No spells known.</p>
+      {% endif %}
+    </div>
+
+    <!-- Features -->
+    <div class="parchment rounded-lg p-5" style="border-left: 4px solid var(--theme-primary);">
+      <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Features</h2>
+      {% if character.features %}
+      <ul class="space-y-2">
+        {% for feature in character.features %}
+        <li class="text-sm text-gray-300 flex items-start gap-2">
+          <span style="color: var(--theme-primary);" class="mt-0.5">&#9670;</span> {{ feature }}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-gray-600 italic text-sm">No features.</p>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<!-- UTILITIES: Avatar Upload + Campaign -->
+<div class="max-w-5xl mx-auto px-10 py-6 border-t section-rule">
+  <div class="grid grid-cols-2 gap-6">
+    <div class="parchment rounded-lg p-5">
+      <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Avatar</h2>
+      <form action="/api/character/{{ character.id }}/avatar" method="post" enctype="multipart/form-data" class="space-y-2">
+        <input type="file" name="avatar_file" accept="image/*" class="text-xs text-gray-400 w-full">
+        <div class="text-xs text-gray-600 text-center">&mdash; or URL &mdash;</div>
+        <input type="text" name="avatar_url" placeholder="Paste image URL"
+               class="action-input w-full rounded px-2 py-1 text-xs"
+               value="{{ character.avatar_url or '' }}">
+        <button type="submit" class="btn-secondary w-full rounded py-1 text-xs mt-1">Save Avatar</button>
+      </form>
+    </div>
+
+    <div class="parchment rounded-lg p-5">
+      <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Campaign</h2>
+      {% if character.campaign %}
+      <p class="text-gray-300 text-sm">{{ character.campaign.name }}</p>
+      {% else %}
+      <p class="text-yellow-500 text-sm mb-2">Unassigned</p>
+      {% if available_campaigns %}
+      <form action="/api/characters/{{ character.id }}/assign" method="post" class="space-y-2">
+        <select name="campaign_id" class="action-input rounded px-2 py-1 text-sm w-full">
+          {% for camp in available_campaigns %}
+          <option value="{{ camp.id }}">{{ camp.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn-action rounded px-3 py-1 text-sm w-full">Assign</button>
+      </form>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- SESSION HISTORY -->
+{% if sessions %}
+<div class="max-w-5xl mx-auto px-10 py-6 border-t section-rule">
+  <h2 class="text-xs tracking-widest uppercase mb-4" style="color: var(--theme-primary);">Session History</h2>
+  <div class="parchment rounded-lg p-5 space-y-2">
+    {% for session in sessions %}
+    <div class="flex items-center justify-between border-b border-gray-700 pb-2">
+      <div>
+        <span class="text-gray-300">Session {{ session.session_number }}</span>
+        <span class="text-gray-500 text-sm ml-2">{{ session.status | capitalize }}</span>
+      </div>
+      {% if session.status == 'active' %}
+      <a href="/play/{{ session.id }}" class="btn-action rounded px-3 py-1 text-sm">Resume</a>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- EDIT PANEL (overlay) -->
+{% if is_owner %}
+<div id="edit-panel" class="fixed inset-0 z-50 overflow-y-auto hidden">
+  <div id="edit-panel-inner" class="max-w-2xl mx-auto mt-16 mb-16 rounded-xl p-8">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xl font-bold" style="color: var(--theme-accent);">Edit Character Sheet</h2>
+      <button onclick="toggleEdit()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+    </div>
+
+    <form action="/api/character/{{ character.id }}/profile" method="post" class="space-y-6">
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide mb-1" style="color: var(--theme-primary);">Title / Nickname</label>
+        <input type="text" name="title" maxlength="200"
+               value="{{ character.title or '' }}"
+               class="action-input w-full rounded px-3 py-2 text-sm"
+               placeholder="The Unbroken, Oathbreaker, etc.">
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide mb-1" style="color: var(--theme-primary);">Motto</label>
+        <input type="text" name="motto" maxlength="500"
+               value="{{ character.motto or '' }}"
+               class="action-input w-full rounded px-3 py-2 text-sm"
+               placeholder="A short quote that defines your character">
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide mb-1" style="color: var(--theme-primary);">Backstory</label>
+        <textarea name="backstory" rows="6" maxlength="5000"
+                  class="parchment-textarea w-full rounded px-3 py-2 text-sm"
+                  placeholder="Where did you come from? What shaped you?">{{ character.backstory or '' }}</textarea>
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide mb-1" style="color: var(--theme-primary);">Character Goals</label>
+        <textarea name="character_goals" rows="3" maxlength="2000"
+                  class="parchment-textarea w-full rounded px-3 py-2 text-sm"
+                  placeholder="What does your character want?">{{ character.character_goals or '' }}</textarea>
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide mb-3" style="color: var(--theme-primary);">Personality Tags</label>
+        <div class="flex flex-wrap gap-2">
+          {% for tag in all_tags %}
+          <label class="cursor-pointer">
+            <input type="checkbox" name="personality_tags" value="{{ tag }}"
+                   {% if character.personality_tags and tag in character.personality_tags %}checked{% endif %}
+                   class="sr-only tag-check">
+            <span class="tag-label px-3 py-1 rounded-full text-sm border border-gray-700 text-gray-500
+                         hover:border-gray-400 hover:text-gray-300 transition-all select-none inline-block">
+              {{ tag }}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="flex gap-3 pt-4">
+        <button type="submit" class="btn-action rounded px-6 py-2 font-bold flex-1">Save Changes</button>
+        <button type="button" onclick="toggleEdit()" class="btn-secondary rounded px-6 py-2">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleEdit() {
+  const panel = document.getElementById('edit-panel');
+  panel.classList.toggle('hidden');
+  document.body.style.overflow = panel.classList.contains('hidden') ? '' : 'hidden';
+}
+</script>
 {% endblock %}

@@ -102,6 +102,36 @@ def assign_character(
     return RedirectResponse(url="/dashboard", status_code=303)
 
 
+@router.post("/character/{character_id}/profile")
+async def update_character_profile(
+    request: Request,
+    character_id: int,
+    backstory: str = Form(""),
+    motto: str = Form(""),
+    title: str = Form(""),
+    character_goals: str = Form(""),
+    personality_tags: list[str] = Form(default=[]),
+    db: DBSession = Depends(get_db),
+):
+    """Update character personality, backstory, and customization fields."""
+    player = get_current_player(request, db)
+    if not player:
+        return RedirectResponse(url="/login", status_code=303)
+
+    character = db.query(Character).filter(Character.id == character_id).first()
+    if not character or character.player_id != player.id:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    character.backstory = backstory.strip() if backstory.strip() else character.backstory
+    character.motto = motto.strip() if motto.strip() else character.motto
+    character.title = title.strip() if title.strip() else character.title
+    character.character_goals = character_goals.strip() if character_goals.strip() else character.character_goals
+    character.personality_tags = personality_tags if personality_tags else character.personality_tags
+
+    db.commit()
+    return RedirectResponse(url=f"/character/{character_id}", status_code=303)
+
+
 @router.post("/characters/{character_id}/unassign")
 def unassign_character(
     request: Request,

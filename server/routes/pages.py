@@ -16,6 +16,94 @@ templates = Jinja2Templates(directory="templates")
 router = APIRouter()
 
 
+# ---- Class Themes (CSS-only, no image assets) ----
+
+CLASS_THEMES = {
+    "fighter": {
+        "primary": "#8ca9c4", "secondary": "#4a6278", "accent": "#c0c8d0",
+        "glow": "rgba(140,169,196,0.45)", "glow_strong": "rgba(140,169,196,0.75)",
+        "gradient": "linear-gradient(135deg, #1a2530 0%, #2a3a4a 50%, #1a2530 100%)",
+        "border_style": "2px solid #8ca9c4", "icon": "\u2694", "flavor": "soldier",
+    },
+    "wizard": {
+        "primary": "#9b6fc4", "secondary": "#4a2a6a", "accent": "#c8a8f0",
+        "glow": "rgba(155,111,196,0.45)", "glow_strong": "rgba(155,111,196,0.75)",
+        "gradient": "linear-gradient(135deg, #1a0a2e 0%, #2e1a4a 50%, #1a0a2e 100%)",
+        "border_style": "2px solid #9b6fc4", "icon": "\u2726", "flavor": "arcane",
+    },
+    "cleric": {
+        "primary": "#d4bc7a", "secondary": "#8a7040", "accent": "#f0e8c0",
+        "glow": "rgba(212,188,122,0.45)", "glow_strong": "rgba(212,188,122,0.8)",
+        "gradient": "linear-gradient(135deg, #1e1a0a 0%, #3a3010 50%, #1e1a0a 100%)",
+        "border_style": "2px solid #d4bc7a", "icon": "\u2600", "flavor": "divine",
+    },
+    "rogue": {
+        "primary": "#8c3a3a", "secondary": "#4a4a54", "accent": "#c85a5a",
+        "glow": "rgba(140,58,58,0.5)", "glow_strong": "rgba(200,90,90,0.7)",
+        "gradient": "linear-gradient(135deg, #0e0e14 0%, #1a1a22 50%, #0e0e14 100%)",
+        "border_style": "2px solid #8c3a3a", "icon": "\u25c6", "flavor": "shadow",
+    },
+    "ranger": {
+        "primary": "#5a8c5a", "secondary": "#2a4a2a", "accent": "#8ab88a",
+        "glow": "rgba(90,140,90,0.45)", "glow_strong": "rgba(90,140,90,0.7)",
+        "gradient": "linear-gradient(135deg, #0a1a0a 0%, #1a2e1a 50%, #0a1a0a 100%)",
+        "border_style": "2px solid #5a8c5a", "icon": "\U0001f3f9", "flavor": "wilderness",
+    },
+    "barbarian": {
+        "primary": "#c43a1a", "secondary": "#6a2a0a", "accent": "#e0886a",
+        "glow": "rgba(196,58,26,0.5)", "glow_strong": "rgba(196,58,26,0.8)",
+        "gradient": "linear-gradient(135deg, #1a0a00 0%, #2e1400 50%, #1a0a00 100%)",
+        "border_style": "2px solid #c43a1a", "icon": "\u26a1", "flavor": "fury",
+    },
+    "bard": {
+        "primary": "#8c44aa", "secondary": "#4a1a6a", "accent": "#c878e8",
+        "glow": "rgba(140,68,170,0.45)", "glow_strong": "rgba(200,120,232,0.7)",
+        "gradient": "linear-gradient(135deg, #140a1e 0%, #281444 50%, #140a1e 100%)",
+        "border_style": "2px dashed #8c44aa", "icon": "\u266a", "flavor": "performance",
+    },
+    "paladin": {
+        "primary": "#7ab0d4", "secondary": "#3a6080", "accent": "#d0eaf8",
+        "glow": "rgba(122,176,212,0.5)", "glow_strong": "rgba(208,234,248,0.75)",
+        "gradient": "linear-gradient(135deg, #0a141e 0%, #162232 50%, #0a141e 100%)",
+        "border_style": "2px solid #7ab0d4", "icon": "\u2726", "flavor": "holy",
+    },
+    "druid": {
+        "primary": "#7a9c3a", "secondary": "#3a5a1a", "accent": "#b4cc7a",
+        "glow": "rgba(122,156,58,0.45)", "glow_strong": "rgba(180,204,122,0.7)",
+        "gradient": "linear-gradient(135deg, #0a1400 0%, #182800 50%, #0a1400 100%)",
+        "border_style": "2px solid #7a9c3a", "icon": "\U0001f33f", "flavor": "nature",
+    },
+    "monk": {
+        "primary": "#c8b86a", "secondary": "#5a5040", "accent": "#e8d8a0",
+        "glow": "rgba(200,184,106,0.4)", "glow_strong": "rgba(232,216,160,0.65)",
+        "gradient": "linear-gradient(135deg, #141008 0%, #24200e 50%, #141008 100%)",
+        "border_style": "1px solid #c8b86a", "icon": "\u25ef", "flavor": "discipline",
+    },
+    "sorcerer": {
+        "primary": "#4ab8e8", "secondary": "#1a5880", "accent": "#88daf8",
+        "glow": "rgba(74,184,232,0.5)", "glow_strong": "rgba(136,218,248,0.8)",
+        "gradient": "linear-gradient(135deg, #001828 0%, #002840 60%, #001828 100%)",
+        "border_style": "2px solid #4ab8e8", "icon": "\u2605", "flavor": "wild magic",
+    },
+    "warlock": {
+        "primary": "#3aaa6a", "secondary": "#1a4a30", "accent": "#6ad8a0",
+        "glow": "rgba(58,170,106,0.45)", "glow_strong": "rgba(106,216,160,0.7)",
+        "gradient": "linear-gradient(135deg, #000e08 0%, #001a10 50%, #000e08 100%)",
+        "border_style": "2px solid #3aaa6a", "icon": "\u2b21", "flavor": "eldritch",
+    },
+}
+FALLBACK_THEME = CLASS_THEMES["fighter"]
+
+PERSONALITY_TAGS = [
+    "Brooding", "Cheerful", "Stoic", "Dramatic", "Sarcastic",
+    "Honorable", "Ruthless", "Chaotic", "Merciful", "Cunning",
+    "Reckless", "Cautious", "Verbose", "Silent", "Charming",
+    "Greedy", "Selfless", "Cowardly", "Brave", "Vengeful",
+    "Scholarly", "Street-smart", "Naive", "World-weary", "Devout",
+    "Bloodthirsty", "Protective", "Strategic", "Berserker", "Pacifist",
+]
+
+
 @router.get("/")
 def home(request: Request, db: DBSession = Depends(get_db)):
     player = get_current_player(request, db)
@@ -245,12 +333,17 @@ def character_profile(request: Request, character_id: int, db: DBSession = Depen
     if not character.campaign_id:
         available_campaigns = db.query(Campaign).filter(Campaign.owner_id == player.id).all()
 
+    theme = CLASS_THEMES.get(character.char_class.lower(), FALLBACK_THEME)
+
     return templates.TemplateResponse("character_profile.html", {
         "request": request,
         "player": player,
         "character": character,
         "sessions": sessions,
         "available_campaigns": available_campaigns,
+        "theme": theme,
+        "is_owner": character.player_id == player.id,
+        "all_tags": PERSONALITY_TAGS,
     })
 
 

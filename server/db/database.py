@@ -80,6 +80,16 @@ def _run_migrations():
         with engine.begin() as conn:
             if "sprite_url" not in existing:
                 conn.execute(text("ALTER TABLE characters ADD COLUMN sprite_url VARCHAR(500)"))
+            if "backstory" not in existing:
+                conn.execute(text("ALTER TABLE characters ADD COLUMN backstory TEXT"))
+            if "motto" not in existing:
+                conn.execute(text("ALTER TABLE characters ADD COLUMN motto VARCHAR(500)"))
+            if "personality_tags" not in existing:
+                conn.execute(text("ALTER TABLE characters ADD COLUMN personality_tags JSON DEFAULT '[]'"))
+            if "title" not in existing:
+                conn.execute(text("ALTER TABLE characters ADD COLUMN title VARCHAR(200)"))
+            if "character_goals" not in existing:
+                conn.execute(text("ALTER TABLE characters ADD COLUMN character_goals TEXT"))
 
     # Player: add email, admin, and subscription fields
     if "players" in inspector.get_table_names():

@@ -112,6 +112,11 @@ class Character(Base):
 
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     sprite_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    backstory: Mapped[str | None] = mapped_column(Text, nullable=True)
+    motto: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    personality_tags: Mapped[dict | None] = mapped_column(JSON, default=list)
+    title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    character_goals: Mapped[str | None] = mapped_column(Text, nullable=True)
     creation_complete: Mapped[bool] = mapped_column(Boolean, default=False)
 
     campaign: Mapped["Campaign | None"] = relationship(back_populates="characters")
