@@ -63,8 +63,9 @@ def create_app() -> FastAPI:
             if ADMIN_USERNAME:
                 from server.db.models import Player
                 admin = db.query(Player).filter(Player.username == ADMIN_USERNAME).first()
-                if admin and not admin.is_admin:
+                if admin and (not admin.is_admin or not admin.subscription_override):
                     admin.is_admin = True
+                    admin.subscription_override = True
                     db.commit()
         finally:
             db.close()
