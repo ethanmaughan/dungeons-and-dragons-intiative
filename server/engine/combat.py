@@ -315,13 +315,39 @@ def start_combat(enemy_names: list, characters: list, game_state, campaign_id: i
     }
 
 
-def end_combat(game_state, characters, db):
-    """End combat: clean up state, remove dead enemies, reset death saves."""
+def end_combat(game_state, characters, db, encounter_state=None, outcome="unknown"):
+    """End combat: clean up state, remove dead enemies, reset death saves.
+
+    If encounter_state is provided, record learning data for each enemy type.
+    """
+    # Write learning data before removing enemies
+    if encounter_state and db:
+        try:
+            from server.ai.tools.enemy_learning import record_encounter_data
+            for enemy_type in set(encounter_state.enemy_types):
+                record_encounter_data(
+                    encounter_state.campaign_id,
+                    enemy_type,
+                    encounter_state,
+                    outcome,
+                    db,
+                )
+        except Exception:
+            import traceback
+            traceback.print_exc()
+
     game_state.game_mode = "exploration"
     game_state.initiative_order = []
     game_state.round_number = 0
     game_state.current_turn_character_id = None
     game_state.combat_positions = {}
+
+    # Clear transient tool state from active_effects
+    if game_state.active_effects:
+        effects = dict(game_state.active_effects) if not isinstance(game_state.active_effects, list) else {}
+        effects.pop("encounter_state_snapshot", None)
+        effects.pop("environment_state", None)
+        game_state.active_effects = effects
 
     for c in characters:
         if c.is_enemy:

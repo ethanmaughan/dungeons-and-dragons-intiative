@@ -392,6 +392,15 @@ async def process_action(
         _profile = get_or_create_party_profile(session.campaign_id, db)
         _party_profile_summary = get_profile_summary(_profile)
 
+    # --- Read cached NPC guide context (from previous turn's maybe_guide) ---
+    _npc_guide_context = None
+    if game_state and game_state.active_effects and not isinstance(game_state.active_effects, list):
+        _npc_guide_context = (game_state.active_effects or {}).get("pending_npc_guide")
+        if _npc_guide_context:
+            effects = dict(game_state.active_effects)
+            effects.pop("pending_npc_guide", None)
+            game_state.active_effects = effects
+
     # --- Call DM ---
     action_for_ai = action_text
     if acting_character and not is_character_creation:
@@ -407,6 +416,7 @@ async def process_action(
         chapter_context=_chapter_context,
         rolling_summary=game_state.rolling_summary if game_state else None,
         party_profile_summary=_party_profile_summary,
+        npc_guide_context=_npc_guide_context,
     )
 
     # ==========================================================
@@ -488,6 +498,64 @@ async def process_action(
                         turn_number,
                         db,
                     )
+
+    # ==========================================================
+    # NPC GUIDE — exploration only, guardrailed, cached for next turn
+    # ==========================================================
+    if (
+        not is_character_creation
+        and game_state
+        and game_state.game_mode == "exploration"
+        and _chapter_context
+    ):
+        try:
+            from server.ai.tools.npc_guide import maybe_guide
+            from server.services.story_service import get_current_chapter
+            _ch_data = get_current_chapter(session.campaign_id, db)
+            if _ch_data:
+                npc_guide_result = await maybe_guide(
+                    session.campaign_id, game_state, characters,
+                    _ch_data, recent_logs, db,
+                )
+                if npc_guide_result:
+                    effects = game_state.active_effects or {}
+                    if isinstance(effects, list):
+                        effects = {}
+                    effects["pending_npc_guide"] = npc_guide_result["inject_into_prompt"]
+                    game_state.active_effects = effects
+                    db.flush()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+
+    # ==========================================================
+    # ENCOUNTER STATE — track player combat actions for enemy learning
+    # ==========================================================
+    if (
+        was_already_in_combat
+        and game_state
+        and game_state.active_effects
+        and not isinstance(game_state.active_effects, list)
+    ):
+        enc_snapshot = (game_state.active_effects or {}).get("encounter_state_snapshot")
+        if enc_snapshot:
+            try:
+                from server.ai.tools import EncounterState
+                enc_state = EncounterState.from_snapshot(enc_snapshot)
+                for r in dice_rolls:
+                    if r.get("type") == "spell_attack" or r.get("type") == "spell_damage":
+                        enc_state.record_player_action("spell", spell_name=r.get("spell"))
+                    elif r.get("type") == "player_attack":
+                        enc_state.record_player_action("attack")
+                    if r.get("type") == "damage" and not r.get("critical", False):
+                        # Player damage to enemy
+                        enc_state.record_damage(True, r.get("total", 0))
+                effects = dict(game_state.active_effects)
+                effects["encounter_state_snapshot"] = enc_state.to_snapshot()
+                game_state.active_effects = effects
+            except Exception:
+                import traceback
+                traceback.print_exc()
 
     # ==========================================================
     # BEHAVIOR CLASSIFICATION — feed NPC disposition + party profile

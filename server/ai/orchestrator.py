@@ -17,7 +17,7 @@ else:
     import ollama
 
 
-def build_system_prompt(campaign, game_state, characters, mode="play", chapter_context: str | None = None, rolling_summary: str | None = None, party_profile_summary: str | None = None) -> str:
+def build_system_prompt(campaign, game_state, characters, mode="play", chapter_context: str | None = None, rolling_summary: str | None = None, party_profile_summary: str | None = None, npc_guide_context: str | None = None) -> str:
     """Assemble the system prompt based on game mode."""
 
     if mode == "character_creation":
@@ -107,6 +107,9 @@ def build_system_prompt(campaign, game_state, characters, mode="play", chapter_c
     if rolling_summary:
         prompt += f"\n\n## Earlier This Session\n{rolling_summary}"
 
+    if npc_guide_context:
+        prompt += f"\n\n## NPC Guidance\n{npc_guide_context}"
+
     return prompt
 
 
@@ -159,6 +162,7 @@ async def process_player_action(
     chapter_context: str | None = None,
     rolling_summary: str | None = None,
     party_profile_summary: str | None = None,
+    npc_guide_context: str | None = None,
 ) -> str:
     """Process a player action and return the DM's narration."""
     try:
@@ -166,6 +170,7 @@ async def process_player_action(
             campaign, game_state, characters, mode=mode,
             chapter_context=chapter_context, rolling_summary=rolling_summary,
             party_profile_summary=party_profile_summary,
+            npc_guide_context=npc_guide_context,
         )
         messages = build_messages(system_prompt, action, recent_logs)
 

@@ -349,3 +349,39 @@ class PartyProfile(Base):
     )
 
     campaign: Mapped["Campaign"] = relationship()
+
+
+# ---- Enemy Learning Models ----
+
+
+class EnemyTypeTactics(Base):
+    """Global per-species learning — aggregated player patterns across all campaigns."""
+    __tablename__ = "enemy_type_tactics"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    enemy_type: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    player_patterns: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    effective_counters: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    total_encounters: Mapped[int] = mapped_column(Integer, default=0)
+    win_count: Mapped[int] = mapped_column(Integer, default=0)
+    loss_count: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class EncounterLog(Base):
+    """Raw encounter record for feeding the enemy learning system."""
+    __tablename__ = "encounter_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), nullable=False)
+    enemy_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    encounter_data: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    outcome: Mapped[str] = mapped_column(String(20), default="unknown")
+    rounds_elapsed: Mapped[int] = mapped_column(Integer, default=0)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    campaign: Mapped["Campaign"] = relationship()
