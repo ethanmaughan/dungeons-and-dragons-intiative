@@ -64,10 +64,10 @@ class SecurityHeadersMiddleware:
 
         async def send_with_headers(message):
             if message["type"] == "http.response.start":
-                headers = dict(message.get("headers", []))
+                headers = list(message.get("headers", []))
                 for key, value in SECURITY_HEADERS.items():
-                    headers[key.lower().encode()] = value.encode()
-                message["headers"] = list(headers.items())
+                    headers.append((key.lower().encode(), value.encode()))
+                message["headers"] = headers
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
