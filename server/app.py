@@ -19,6 +19,16 @@ from server.routes.subscription import router as subscription_router
 from server.routes.admin import router as admin_router
 
 
+class ASGILogger:
+    """Log every ASGI scope type to trace WebSocket connections."""
+    def __init__(self, app):
+        self.app = app
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            print(f"[ASGI] {scope['type']} {scope.get('path', '?')}", flush=True)
+        await self.app(scope, receive, send)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Foray", version="1.0.0")
 
