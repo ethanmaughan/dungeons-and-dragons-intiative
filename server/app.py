@@ -19,16 +19,6 @@ from server.routes.subscription import router as subscription_router
 from server.routes.admin import router as admin_router
 
 
-class ASGILogger:
-    """Log every ASGI scope type to trace WebSocket connections."""
-    def __init__(self, app):
-        self.app = app
-    async def __call__(self, scope, receive, send):
-        if scope["type"] in ("http", "websocket"):
-            print(f"[ASGI] {scope['type']} {scope.get('path', '?')}", flush=True)
-        await self.app(scope, receive, send)
-
-
 def create_app() -> FastAPI:
     app = FastAPI(title="Foray", version="1.0.0")
 
@@ -36,9 +26,9 @@ def create_app() -> FastAPI:
     def health_check():
         return JSONResponse({"status": "ok"})
 
-    # Middleware
+    # Middleware (outermost first)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-    # SecurityHeadersMiddleware temporarily disabled to debug WebSocket
 
     # Rate limiting
     app.state.limiter = limiter

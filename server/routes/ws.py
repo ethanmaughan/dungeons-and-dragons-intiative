@@ -37,16 +37,13 @@ def get_player_from_ws(ws: WebSocket, db: DBSession) -> Player | None:
 @router.websocket("/ws/session/{session_id}")
 async def websocket_session(ws: WebSocket, session_id: int):
     """Main WebSocket endpoint for a game session."""
-    print(f"[WS] Connection attempt for session {session_id}", flush=True)
     db = SessionLocal()
     try:
         await ws.accept()
-        print(f"[WS] Accepted connection for session {session_id}", flush=True)
 
         # Get player from session cookie
         scope_session = ws.scope.get("session", {})
         player_id = scope_session.get("player_id")
-        print(f"[WS] Player ID from session: {player_id}", flush=True)
         if not player_id:
             await ws.send_text(json.dumps({"type": "error", "message": "Not authenticated"}))
             await ws.close()
@@ -59,11 +56,9 @@ async def websocket_session(ws: WebSocket, session_id: int):
             return
 
         if not player_can_play(player):
-            print(f"[WS] Player {player_id} cannot play — subscription required", flush=True)
             await ws.send_text(json.dumps({"type": "error", "message": "Subscription required"}))
             await ws.close()
             return
-        print(f"[WS] Player {player_id} ({player.username}) authorized", flush=True)
 
         # Verify player has a character in this session's campaign
         session = db.query(GameSession).filter(GameSession.id == session_id).first()
