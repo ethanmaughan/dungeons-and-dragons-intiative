@@ -1,16 +1,17 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from server.config import DATABASE_URL
 
-engine = create_engine(
-    DATABASE_URL,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
-    pool_recycle=300,
-)
+# Use NullPool for external databases (Supabase PgBouncer handles pooling)
+# Use default pool for local SQLite
+_is_sqlite = DATABASE_URL.startswith("sqlite")
+_engine_kwargs = {"echo": False}
+if not _is_sqlite:
+    _engine_kwargs["poolclass"] = NullPool
+
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 SessionLocal = sessionmaker(bind=engine)
 
 

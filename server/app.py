@@ -26,9 +26,9 @@ def create_app() -> FastAPI:
     def health_check():
         return JSONResponse({"status": "ok"})
 
-    # Middleware (outermost first)
-    app.add_middleware(SecurityHeadersMiddleware)
+    # Middleware
     app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+    # SecurityHeadersMiddleware temporarily disabled to debug WebSocket
 
     # Rate limiting
     app.state.limiter = limiter
