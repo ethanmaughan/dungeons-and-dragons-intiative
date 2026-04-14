@@ -26,13 +26,69 @@
         border-radius: 50%;
         display: inline-block;
     }
-    .online-dot.connected { background-color: #22c55e; }
-    .online-dot.disconnected { background-color: #6b7280; }
-    #combat-map-container { background-color: #2d5a1d; }
+    .online-dot.connected { background-color: #5a8c4a; }
+    .online-dot.disconnected { background-color: #6b5a4a; }
+    #combat-map-container { background-color: #2d4a1d; }
     .map-init-current {
         background-color: rgba(212, 168, 67, 0.2);
         border: 1px solid #d4a843;
         border-radius: 4px;
+    }
+    /* Dice toast system */
+    .dice-toast {
+        background: #2d2418;
+        border: 1px solid #d4a843;
+        border-radius: 8px;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #e8dcc8;
+        font-family: 'Inter', sans-serif;
+        animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in 3.7s forwards;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        pointer-events: auto;
+        min-width: 240px;
+    }
+    .dice-icon {
+        font-family: 'Cinzel', serif;
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: #d4a843;
+        min-width: 36px;
+        text-align: center;
+    }
+    .dice-result {
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .dice-outcome {
+        font-size: 0.75rem;
+        color: #b8a898;
+    }
+    .dice-toast.critical {
+        border-color: #f0c050;
+        box-shadow: 0 0 20px rgba(240,192,80,0.4), 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .dice-toast.critical .dice-icon {
+        color: #f0c050;
+        text-shadow: 0 0 10px rgba(240,192,80,0.6);
+    }
+    .dice-toast.fumble {
+        border-color: #c85a4a;
+        box-shadow: 0 0 15px rgba(200,90,74,0.3);
+    }
+    .dice-toast.fumble .dice-icon {
+        color: #c85a4a;
+    }
+    @keyframes toastIn {
+        from { opacity: 0; transform: translateX(40px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes toastOut {
+        from { opacity: 1; }
+        to { opacity: 0; transform: translateY(10px); }
     }
 </style>
 {% endblock %}
@@ -40,7 +96,7 @@
 {% block content %}
 <div class="flex flex-col h-screen">
     <!-- Header -->
-    <header class="parchment px-4 py-3 flex items-center justify-between border-b border-gray-700">
+    <header class="parchment px-4 py-3 flex items-center justify-between" style="border-bottom: 1px solid #3d3228;">
         <div class="flex items-center gap-3">
             <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white text-xl" title="Menu">
                 &#9776;
@@ -68,7 +124,7 @@
     <div id="sidebar-overlay" class="sidebar-overlay fixed inset-0 bg-black/50 z-40" onclick="toggleSidebar()"></div>
 
     <!-- Sidebar -->
-    <div id="sidebar" class="sidebar fixed top-0 left-0 h-full w-72 parchment z-50 border-r border-gray-700 overflow-y-auto">
+    <div id="sidebar" class="sidebar fixed top-0 left-0 h-full w-72 parchment z-50 border-r border-leather overflow-y-auto">
         <div class="p-4">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="gold-text font-bold text-lg">Menu</h2>
@@ -91,13 +147,13 @@
             {% include "partials/initiative_tracker.html" %}
 
             <!-- Party -->
-            <div class="border-t border-gray-700 pt-4 mb-6">
+            <div class="border-t border-leather pt-4 mb-6">
                 <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Party</h3>
                 <div id="party-panel">
                 {% for c in characters %}
                     {% if not c.is_npc and not c.is_enemy %}
                     <div class="mb-3" id="party-member-{{ c.id }}">
-                        <div class="flex items-center justify-between cursor-pointer hover:bg-gray-800/50 rounded px-1 -mx-1 py-0.5"
+                        <div class="flex items-center justify-between cursor-pointer hover:bg-leather/50 rounded px-1 -mx-1 py-0.5"
                              onclick="toggleCharSheet({{ c.id }})">
                             <div class="flex items-center gap-2">
                                 <span class="online-dot disconnected" id="online-dot-{{ c.player_id }}"></span>
@@ -108,7 +164,7 @@
                             </div>
                             <span class="text-xs text-gray-500">{{ c.race }} {{ c.char_class }}</span>
                         </div>
-                        <div class="mt-1 bg-gray-800 rounded-full h-2 overflow-hidden">
+                        <div class="mt-1 bg-leather rounded-full h-2 overflow-hidden">
                             {% set hp_pct = (c.hp_current / c.hp_max * 100) if c.hp_max > 0 else 0 %}
                             <div class="h-full rounded-full hp-bar-fill" id="hp-bar-{{ c.id }}"
                                  style="width: {{ hp_pct }}%; background-color: {% if hp_pct > 50 %}#16a34a{% elif hp_pct > 25 %}#ca8a04{% else %}#dc2626{% endif %};"></div>
@@ -153,7 +209,7 @@
                                 <span class="text-red-400 text-sm font-bold">{{ c.character_name }}</span>
                                 <span class="text-xs text-gray-500">AC {{ c.ac }}</span>
                             </div>
-                            <div class="mt-1 bg-gray-800 rounded-full h-2 overflow-hidden">
+                            <div class="mt-1 bg-leather rounded-full h-2 overflow-hidden">
                                 {% set hp_pct = (c.hp_current / c.hp_max * 100) if c.hp_max > 0 else 0 %}
                                 <div class="h-full rounded-full bg-red-600" id="hp-bar-{{ c.id }}" style="width: {{ hp_pct }}%"></div>
                             </div>
@@ -169,7 +225,7 @@
             <!-- Character Sheets (all party members, toggled on click) -->
             {% for c in characters %}
             {% if not c.is_npc and not c.is_enemy %}
-            <div class="border-t border-gray-700 pt-4 mb-6 hidden" id="char-sheet-{{ c.id }}">
+            <div class="border-t border-leather pt-4 mb-6 hidden" id="char-sheet-{{ c.id }}">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-xs text-gray-500 uppercase tracking-wider">
                         {{ c.character_name }}'s Sheet
@@ -262,7 +318,7 @@
             {% endfor %}
 
             <!-- Game Info -->
-            <div class="border-t border-gray-700 pt-4">
+            <div class="border-t border-leather pt-4">
                 <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">Game Info</h3>
                 <div class="text-sm space-y-1">
                     <div class="text-gray-400">Campaign: <span class="text-gray-300">{{ session.campaign.name }}</span></div>
@@ -313,7 +369,7 @@
                     <div class="text-lg font-bold gold-text" id="speed-remaining">30</div>
                     <div class="text-sm text-gray-400">/ <span id="speed-total">30</span> ft</div>
                 </div>
-                <div class="mt-1 bg-gray-800 rounded-full h-2 overflow-hidden" style="width: 120px;">
+                <div class="mt-1 bg-leather rounded-full h-2 overflow-hidden" style="width: 120px;">
                     <div class="h-full rounded-full bg-yellow-600" id="speed-bar" style="width: 100%;"></div>
                 </div>
                 <div class="text-xs text-gray-500 mt-1">Arrow keys to move</div>
@@ -322,7 +378,7 @@
     </div>
 
     <!-- Action Bar -->
-    <div class="parchment px-4 py-4 border-t border-gray-700">
+    <div class="parchment px-4 py-4 border-t border-leather">
         <div id="action-bar" class="flex gap-3">
             <input type="text" id="action-input"
                    placeholder="{% if game_state and game_state.game_mode == 'character_creation' %}Say hello to begin character creation...{% elif game_state and game_state.game_mode == 'combat' %}It's your turn! Describe your action...{% else %}What do you do?{% endif %}"
@@ -342,6 +398,9 @@
         </div>
     </div>
 </div>
+
+<!-- Dice Toast Container -->
+<div id="dice-toast-container" class="fixed bottom-4 right-4 z-40 flex flex-col-reverse gap-2 pointer-events-none"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -443,7 +502,7 @@
         }
 
         // Token border (1px colored border around cell)
-        mapCtx.fillStyle = pos.is_enemy ? '#8b0000' : '#1a3a5c';
+        mapCtx.fillStyle = pos.is_enemy ? '#8b3a1a' : '#3a6a50';
         mapCtx.fillRect(px, py, s, s);
 
         // Sprite image or fallback
@@ -521,7 +580,7 @@
 
         narrativePanel.style.width = '320px';
         narrativePanel.style.minWidth = '320px';
-        narrativePanel.style.borderRight = '1px solid #3a3a5e';
+        narrativePanel.style.borderRight = '1px solid #3d3228';
 
         mapContainer.classList.remove('hidden');
 
@@ -643,6 +702,11 @@
 
             case 'narrative':
                 appendNarrative(data.html);
+                if (data.dice_rolls) {
+                    data.dice_rolls.forEach((roll, i) => {
+                        setTimeout(() => showDiceToast(roll), i * 300);
+                    });
+                }
                 actionPending = false;
                 break;
 
@@ -740,6 +804,53 @@
     }
 
     // --- UI Updates ---
+    function showDiceToast(roll) {
+        const container = document.getElementById('dice-toast-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = 'dice-toast';
+
+        if (roll.critical) toast.classList.add('critical');
+        if ((roll.type === 'player_attack' || roll.type === 'enemy_attack') && roll.roll === 1) toast.classList.add('fumble');
+
+        let icon = 'd20';
+        let result = '';
+        let outcome = '';
+
+        if (roll.type === 'player_attack' || roll.type === 'enemy_attack' || roll.type === 'spell_attack') {
+            result = `${roll.roll} + ${roll.modifier} = ${roll.total}`;
+            outcome = `vs AC ${roll.target_ac} — ${roll.hit ? 'Hit!' : 'Miss!'}`;
+            if (roll.critical) outcome = 'CRITICAL HIT!';
+            if (roll.roll === 1) outcome = 'FUMBLE!';
+        } else if (roll.type === 'damage') {
+            icon = 'dmg';
+            result = `${roll.total} damage`;
+            if (roll.critical) result += ' (critical)';
+        } else if (roll.type === 'saving_throw') {
+            result = `${roll.roll} → ${roll.total}`;
+            outcome = `DC ${roll.dc} — ${roll.success ? 'Saved!' : 'Failed!'}`;
+        } else if (roll.type === 'healing') {
+            icon = 'heal';
+            result = `+${roll.total} HP`;
+        } else if (roll.type === 'death_save') {
+            result = `Rolled ${roll.roll}`;
+            outcome = roll.outcome || '';
+        } else {
+            return;
+        }
+
+        toast.innerHTML = `
+            <div class="dice-icon">${icon}</div>
+            <div>
+                <div class="dice-result">${result}</div>
+                ${outcome ? `<div class="dice-outcome">${outcome}</div>` : ''}
+            </div>
+        `;
+
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
     function appendNarrative(html) {
         const content = document.getElementById('narrative-content');
         content.insertAdjacentHTML('beforeend', html);

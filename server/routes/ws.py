@@ -150,6 +150,7 @@ async def websocket_session(ws: WebSocket, session_id: int):
                         await manager.broadcast(session_id, {
                             "type": "narrative",
                             "html": html,
+                            "dice_rolls": log.dice_rolls or [],
                         })
 
                     # Broadcast combat start as a SEPARATE event (if combat just triggered)
@@ -169,9 +170,11 @@ async def websocket_session(ws: WebSocket, session_id: int):
                         enemy_html = templates.get_template("partials/narrative_entry.html").render(
                             log=et["log"],
                         )
+                        enemy_dice = et["log"].dice_rolls if hasattr(et["log"], "dice_rolls") else et.get("dice_rolls", [])
                         await manager.broadcast(session_id, {
                             "type": "narrative",
                             "html": enemy_html,
+                            "dice_rolls": enemy_dice or [],
                         })
                         await asyncio.sleep(0.5)
 

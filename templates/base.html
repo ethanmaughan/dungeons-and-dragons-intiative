@@ -6,26 +6,32 @@
     <title>{% block title %}Foray{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         body {
-            background-color: #1a1a2e;
-            color: #e0e0e0;
-            font-family: 'Georgia', serif;
+            background-color: #18140e;
+            color: #e8dcc8;
+            font-family: 'Lora', Georgia, serif;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Cinzel', Georgia, serif;
         }
         .parchment {
-            background-color: #2a2a3e;
-            border: 1px solid #3a3a5e;
+            background-color: #241e16;
+            border: 1px solid #3d3228;
         }
         .gold-text {
             color: #d4a843;
         }
         .narrative-text {
             line-height: 1.8;
+            font-family: 'Lora', Georgia, serif;
         }
         .action-input {
-            background-color: #2a2a3e;
-            border: 1px solid #3a3a5e;
-            color: #e0e0e0;
+            background-color: #241e16;
+            border: 1px solid #3d3228;
+            color: #e8dcc8;
+            font-family: 'Lora', Georgia, serif;
         }
         .action-input:focus {
             border-color: #d4a843;
@@ -33,51 +39,63 @@
             box-shadow: 0 0 0 2px rgba(212, 168, 67, 0.3);
         }
         .btn-action {
-            background-color: #8b0000;
-            color: #e0e0e0;
+            background-color: #8b3a1a;
+            color: #e8dcc8;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
             transition: background-color 0.2s;
         }
         .btn-action:hover {
-            background-color: #a50000;
+            background-color: #a84828;
         }
         .btn-action:disabled {
-            background-color: #4a4a4a;
+            background-color: #3d3228;
             cursor: wait;
         }
         .btn-secondary {
-            background-color: #3a3a5e;
-            color: #e0e0e0;
+            background-color: #3d3228;
+            color: #e8dcc8;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
             transition: background-color 0.2s;
         }
         .btn-secondary:hover {
-            background-color: #4a4a6e;
+            background-color: #4d4238;
         }
         .player-action {
             color: #7eb8da;
             font-style: italic;
         }
         .dm-narration {
-            color: #e0d5c0;
+            color: #f0e8d8;
         }
         #narrative-panel {
             scroll-behavior: smooth;
         }
+        /* Utility classes */
+        .text-faded { color: #b8a898; }
+        .text-parchment { color: #e8dcc8; }
+        .text-rust { color: #c85a4a; }
+        .text-moss { color: #5a8c4a; }
+        .border-leather { border-color: #3d3228; }
+        .bg-hearth { background-color: #18140e; }
+        .bg-leather { background-color: #241e16; }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body class="min-h-screen">
     <!-- Nav Bar -->
-    <nav class="px-4 py-2 flex items-center justify-between border-b border-gray-800 text-sm">
-        <a href="/" class="gold-text font-bold text-lg">Foray</a>
+    <nav class="px-4 py-2 flex items-center justify-between text-sm" style="border-bottom: 1px solid #2d2418; font-family: 'Inter', sans-serif;">
+        <a href="/" class="gold-text font-bold text-lg" style="font-family: 'Cinzel', serif;">Foray</a>
         <div class="flex items-center gap-4">
             {% if player %}
-                <span class="text-gray-400">{{ player.display_name }}</span>
-                <a href="/dashboard" class="text-gray-300 hover:text-white">Dashboard</a>
-                <a href="/subscription" class="text-gray-300 hover:text-white">Subscription</a>
-                <a href="/account" class="text-gray-300 hover:text-white">Account</a>
-                <a href="/auth/logout" class="text-gray-400 hover:text-red-400">Logout</a>
+                <span class="text-faded">{{ player.display_name }}</span>
+                <a href="/dashboard" class="text-faded hover:text-parchment transition-colors">Dashboard</a>
+                <a href="/subscription" class="text-faded hover:text-parchment transition-colors">Subscription</a>
+                <a href="/account" class="text-faded hover:text-parchment transition-colors">Account</a>
+                <a href="/auth/logout" class="text-faded hover:text-rust transition-colors">Logout</a>
             {% else %}
-                <a href="/login" class="text-gray-300 hover:text-white">Login</a>
+                <a href="/login" class="text-faded hover:text-parchment transition-colors">Login</a>
                 <a href="/register" class="gold-text hover:underline">Register</a>
             {% endif %}
         </div>

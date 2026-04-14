@@ -8,18 +8,18 @@
 {% if log.narration_text %}
 {% if log.actor == 'system' %}
 {# System messages: combat end, TPK, etc. #}
-<div class="narrative-text pl-4 border-l-2 border-gray-700">
-    <div class="mt-1 whitespace-pre-wrap text-gray-400 italic">{{ log.narration_text }}</div>
+<div class="narrative-text pl-4 border-l-2 border-leather">
+    <div class="mt-1 whitespace-pre-wrap text-faded italic">{{ log.narration_text }}</div>
 </div>
 {% elif not log.action_text %}
 {# Autonomous narration (enemy turns, death saves) — show the actor's name #}
-<div class="narrative-text pl-4 border-l-2 border-red-800">
-    <span class="text-red-400 text-sm font-bold">{{ log.actor }}</span>
-    <div class="mt-1 whitespace-pre-wrap text-red-200/80">{{ log.narration_text }}</div>
+<div class="narrative-text pl-4 border-l-2" style="border-color: #8b3a1a">
+    <span class="text-rust text-sm font-bold">{{ log.actor }}</span>
+    <div class="mt-1 whitespace-pre-wrap" style="color: #d8a090">{{ log.narration_text }}</div>
 </div>
 {% else %}
 {# DM response to a player action #}
-<div class="dm-narration narrative-text pl-4 border-l-2 border-yellow-800">
+<div class="dm-narration narrative-text pl-4 border-l-2 border-amber-900">
     <span class="gold-text text-sm font-bold">Game Master</span>
     <div class="mt-1 whitespace-pre-wrap">{{ log.narration_text }}</div>
 </div>

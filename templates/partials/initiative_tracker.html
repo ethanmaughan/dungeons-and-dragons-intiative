@@ -1,6 +1,6 @@
 <!-- Initiative tracker — shown during combat mode -->
 <div id="initiative-tracker" class="parchment rounded-lg p-3 mb-4 {% if not game_state or game_state.game_mode != 'combat' %}hidden{% endif %}">
-    <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-2">Initiative — Round <span id="round-number">{{ game_state.round_number if game_state else 0 }}</span></h3>
+    <h3 class="text-xs text-faded uppercase tracking-wider mb-2">Initiative — Round <span id="round-number">{{ game_state.round_number if game_state else 0 }}</span></h3>
     <div id="initiative-list" class="space-y-1">
         {% if game_state and game_state.initiative_order %}
             {% for entry in game_state.initiative_order %}
@@ -11,11 +11,12 @@
                     {% if game_state.current_turn_character_id == entry.character_id %}
                     <span class="text-yellow-400">&#9654;</span>
                     {% endif %}
-                    <span class="{% if entry.is_enemy %}text-red-400{% else %}gold-text{% endif %} font-bold">
+                    <span class="{% if entry.is_enemy %}{% else %}gold-text{% endif %} font-bold"
+                          {% if entry.is_enemy %}style="color: #c85a4a"{% endif %}>
                         {{ entry.character_name }}
                     </span>
                 </div>
-                <span class="text-gray-500 text-xs">{{ entry.initiative }}</span>
+                <span class="text-faded text-xs">{{ entry.initiative }}</span>
             </div>
             {% endfor %}
         {% endif %}

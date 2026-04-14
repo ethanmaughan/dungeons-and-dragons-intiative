@@ -8,32 +8,32 @@
         <h2 class="text-2xl gold-text mb-6 text-center">Join the Adventure</h2>
 
         {% if error %}
-        <div class="bg-red-900/50 border border-red-700 rounded px-4 py-2 mb-4 text-red-300 text-sm">
+        <div class="rounded px-4 py-2 mb-4 text-sm" style="background: rgba(139,58,26,0.3); border: 1px solid; border-color: #8b3a1a; color: #c85a4a;">
             {{ error }}
         </div>
         {% endif %}
 
         <form action="/auth/register" method="post" class="space-y-4">
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Username</label>
+                <label class="block text-sm text-faded mb-1">Username</label>
                 <input type="text" name="username" required autofocus
                        class="action-input w-full rounded px-3 py-2"
                        placeholder="Choose a username">
             </div>
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Display Name</label>
+                <label class="block text-sm text-faded mb-1">Display Name</label>
                 <input type="text" name="display_name"
                        class="action-input w-full rounded px-3 py-2"
                        placeholder="How others see you (optional)">
             </div>
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Email</label>
+                <label class="block text-sm text-faded mb-1">Email</label>
                 <input type="email" name="email"
                        class="action-input w-full rounded px-3 py-2"
                        placeholder="For receipts and account recovery (optional)">
             </div>
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Password</label>
+                <label class="block text-sm text-faded mb-1">Password</label>
                 <input type="password" name="password" required minlength="8"
                        class="action-input w-full rounded px-3 py-2"
                        placeholder="At least 8 characters">
@@ -43,7 +43,7 @@
             </button>
         </form>
 
-        <p class="text-center text-gray-500 text-sm mt-6">
+        <p class="text-center text-faded text-sm mt-6">
             Already have an account? <a href="/login" class="gold-text hover:underline">Login</a>
         </p>
     </div>

@@ -9,7 +9,7 @@
     </div>
 
     {% if not can_play %}
-    <div class="bg-yellow-900/30 border border-yellow-700 rounded px-4 py-3 mb-6 text-yellow-300 text-sm">
+    <div class="bg-yellow-900/30 border border-yellow-700 rounded px-4 py-3 mb-6 gold-text text-sm">
         Subscribe to create campaigns and join games.
         <a href="/account" class="gold-text hover:underline font-bold ml-1">Subscribe — $12/month</a>
     </div>
@@ -39,14 +39,14 @@
         {% if unassigned_chars %}
         <form id="join-code-submit" class="flex items-end gap-4">
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Invite Code</label>
+                <label class="block text-sm text-faded mb-1">Invite Code</label>
                 <input type="text" name="invite_code" id="join-invite-code" required maxlength="6"
                        class="action-input rounded px-3 py-2 uppercase tracking-widest text-center font-mono text-lg w-36"
                        placeholder="A7K3XP"
                        style="letter-spacing: 0.2em;">
             </div>
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Character</label>
+                <label class="block text-sm text-faded mb-1">Character</label>
                 <select name="character_id" id="join-character-id" class="action-input rounded px-3 py-2">
                     {% for ch in unassigned_chars %}
                     <option value="{{ ch.id }}">{{ ch.character_name }} ({{ ch.race }} {{ ch.char_class }})</option>
@@ -55,10 +55,10 @@
             </div>
             <button type="submit" class="btn-action rounded px-6 py-2 font-bold">Join</button>
         </form>
-        <div id="join-code-error" class="bg-red-900/50 border border-red-700 rounded px-3 py-2 text-red-300 text-sm mt-3 hidden"></div>
-        <div id="join-code-success" class="bg-green-900/50 border border-green-700 rounded px-3 py-2 text-green-300 text-sm mt-3 hidden"></div>
+        <div id="join-code-error" class="bg-red-900/50 border border-red-700 rounded px-3 py-2 text-rust text-sm mt-3 hidden"></div>
+        <div id="join-code-success" class="bg-green-900/50 border border-green-700 rounded px-3 py-2 text-moss text-sm mt-3 hidden"></div>
         {% else %}
-        <p class="text-gray-400 text-sm">You need an unassigned character to join a campaign. <a href="/character/create" class="gold-text hover:underline">Create one</a>.</p>
+        <p class="text-faded text-sm">You need an unassigned character to join a campaign. <a href="/character/create" class="gold-text hover:underline">Create one</a>.</p>
         {% endif %}
     </div>
 
@@ -67,19 +67,19 @@
         <h2 class="text-xl gold-text mb-4">New Campaign</h2>
         <form action="/api/campaigns" method="post" class="space-y-4">
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Campaign Name</label>
+                <label class="block text-sm text-faded mb-1">Campaign Name</label>
                 <input type="text" name="name" required
                        class="action-input w-full rounded px-3 py-2"
                        placeholder="Name your adventure">
             </div>
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Setting</label>
+                <label class="block text-sm text-faded mb-1">Setting</label>
                 <textarea name="setting" rows="2"
                           class="action-input w-full rounded px-3 py-2"
                           placeholder="Describe the world">A classic fantasy world of swords, sorcery, and ancient ruins.</textarea>
             </div>
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Story</label>
+                <label class="block text-sm text-faded mb-1">Story</label>
                 <select name="story_slug" class="action-input w-full rounded px-3 py-2">
                     <option value="">No story (freeform adventure)</option>
                     {% for story in stories %}
@@ -89,14 +89,14 @@
             </div>
             <div class="flex gap-6">
                 <div>
-                    <label class="block text-sm text-gray-400 mb-1">Visibility</label>
+                    <label class="block text-sm text-faded mb-1">Visibility</label>
                     <select name="visibility" class="action-input rounded px-3 py-2">
                         <option value="open">Open (anyone can join)</option>
                         <option value="private">Private (requires approval)</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-400 mb-1">Max Players</label>
+                    <label class="block text-sm text-faded mb-1">Max Players</label>
                     <select name="max_players" class="action-input rounded px-3 py-2">
                         <option value="2">2</option>
                         <option value="3">3</option>
@@ -116,12 +116,12 @@
         <h2 class="text-xl gold-text mb-4">Join Requests</h2>
         <div class="space-y-3">
             {% for jr in pending_requests %}
-            <div class="flex items-center justify-between bg-gray-800/50 rounded px-4 py-3">
+            <div class="flex items-center justify-between bg-leather/50 rounded px-4 py-3">
                 <div>
-                    <span class="text-gray-300 font-bold">{{ jr.player.display_name or jr.player.username }}</span>
-                    <span class="text-gray-500 mx-1">wants to join</span>
+                    <span class="text-parchment font-bold">{{ jr.player.display_name or jr.player.username }}</span>
+                    <span class="text-faded mx-1">wants to join</span>
                     <span class="gold-text font-bold">{{ jr.campaign.name }}</span>
-                    <span class="text-gray-500 mx-1">as</span>
+                    <span class="text-faded mx-1">as</span>
                     <span class="text-blue-400">{{ jr.character.character_name }} ({{ jr.character.race }} {{ jr.character.char_class }})</span>
                 </div>
                 <div class="flex gap-2">
@@ -140,7 +140,7 @@
 
     <!-- Your Characters -->
     <div class="mb-10">
-        <h2 class="text-xl text-gray-300 mb-4">Your Characters</h2>
+        <h2 class="text-xl text-parchment mb-4">Your Characters</h2>
         {% if characters %}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {% for c in characters %}
@@ -148,27 +148,27 @@
                 <a href="/character/{{ c.id }}" class="block hover:opacity-90 transition-opacity">
                     <div class="flex items-center gap-3 mb-3">
                         {% if c.avatar_url %}
-                        <img src="{{ c.avatar_url }}" alt="{{ c.character_name }}" class="w-12 h-12 rounded-full object-cover border border-gray-600">
+                        <img src="{{ c.avatar_url }}" alt="{{ c.character_name }}" class="w-12 h-12 rounded-full object-cover border border-leather">
                         {% else %}
-                        <div class="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-xl gold-text">
+                        <div class="w-12 h-12 rounded-full bg-leather flex items-center justify-center text-xl gold-text">
                             {{ c.character_name[0] }}
                         </div>
                         {% endif %}
                         <div>
                             <div class="gold-text font-bold">{{ c.character_name }}</div>
-                            <div class="text-sm text-gray-400">{{ c.race }} {{ c.char_class }} {{ c.level }}</div>
+                            <div class="text-sm text-faded">{{ c.race }} {{ c.char_class }} {{ c.level }}</div>
                         </div>
                     </div>
-                    <div class="text-sm text-gray-400 mb-2">
-                        <span class="text-red-400">HP {{ c.hp_current }}/{{ c.hp_max }}</span>
+                    <div class="text-sm text-faded mb-2">
+                        <span class="text-rust">HP {{ c.hp_current }}/{{ c.hp_max }}</span>
                         &middot; AC {{ c.ac }}
                     </div>
                 </a>
-                <div class="text-xs text-gray-500 mb-2">
+                <div class="text-xs text-faded mb-2">
                     {% if c.campaign %}
                         Campaign: {{ c.campaign.name }}
                     {% elif c.creation_complete %}
-                        <span class="text-yellow-500">Unassigned</span>
+                        <span class="gold-text">Unassigned</span>
                         <div class="mt-1 space-y-1">
                             {% if campaigns %}
                             <form action="/api/characters/{{ c.id }}/assign" method="post" class="flex items-center gap-1">
@@ -188,27 +188,27 @@
                             </form>
                         </div>
                     {% else %}
-                        <span class="text-yellow-500">Unassigned</span>
+                        <span class="gold-text">Unassigned</span>
                     {% endif %}
                 </div>
                 {% if not c.creation_complete %}
-                <div class="text-yellow-500 text-xs mb-2">Character creation in progress</div>
+                <div class="gold-text text-xs mb-2">Character creation in progress</div>
                 {% endif %}
                 <button onclick="showDeleteModal('character', {{ c.id }}, '{{ c.character_name }}')"
-                        class="text-red-800 hover:text-red-400 text-xs transition-colors">
+                        class="text-rust hover:text-rust text-xs transition-colors">
                     Delete
                 </button>
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-gray-500 italic">No characters yet. Create one to get started!</p>
+        <p class="text-faded italic">No characters yet. Create one to get started!</p>
         {% endif %}
     </div>
 
     <!-- Your Campaigns -->
     <div class="mb-10">
-        <h2 class="text-xl text-gray-300 mb-4">Your Campaigns</h2>
+        <h2 class="text-xl text-parchment mb-4">Your Campaigns</h2>
         {% if campaigns %}
         <div class="space-y-2">
             {% for campaign in campaigns %}
@@ -218,9 +218,9 @@
                         <div class="flex items-center gap-2">
                             <span class="gold-text font-bold">{{ campaign.name }}</span>
                             {% if campaign.visibility == "private" %}
-                            <span class="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">Private</span>
+                            <span class="text-xs bg-leather text-parchment px-1.5 py-0.5 rounded">Private</span>
                             {% else %}
-                            <span class="text-xs bg-green-900/50 text-green-400 px-1.5 py-0.5 rounded">Open</span>
+                            <span class="text-xs bg-green-900/50 text-moss px-1.5 py-0.5 rounded">Open</span>
                             {% endif %}
                         </div>
                         {% set assigned = [] %}
@@ -228,19 +228,19 @@
                             {% if assigned.append(c) %}{% endif %}
                         {% endfor %}
                         {% if assigned %}
-                        <span class="text-gray-500 text-sm">
+                        <span class="text-faded text-sm">
                             {{ assigned | map(attribute='character_name') | join(', ') }}
                         </span>
                         {% else %}
-                        <span class="text-yellow-500 text-sm">No character assigned</span>
+                        <span class="gold-text text-sm">No character assigned</span>
                         {% endif %}
                     </div>
                     <div class="flex items-center gap-3">
                         <!-- Invite code (owner only) -->
                         {% if campaign.owner_id == player.id and campaign.invite_code %}
                         <div class="flex items-center gap-1">
-                            <span class="text-xs text-gray-500">Code:</span>
-                            <code class="text-xs font-mono gold-text bg-gray-800 px-1.5 py-0.5 rounded tracking-wider cursor-pointer"
+                            <span class="text-xs text-faded">Code:</span>
+                            <code class="text-xs font-mono gold-text bg-leather px-1.5 py-0.5 rounded tracking-wider cursor-pointer"
                                   onclick="navigator.clipboard.writeText('{{ campaign.invite_code }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='{{ campaign.invite_code }}', 1500)"
                                   title="Click to copy">{{ campaign.invite_code }}</code>
                         </div>
@@ -249,14 +249,14 @@
                         {% if campaign.owner_id == player.id %}
                         <form action="/api/campaigns/{{ campaign.id }}/visibility" method="post" class="inline">
                             <input type="hidden" name="visibility" value="{% if campaign.visibility == 'open' %}private{% else %}open{% endif %}">
-                            <button type="submit" class="text-xs text-gray-400 hover:text-gray-200 transition-colors"
+                            <button type="submit" class="text-xs text-faded hover:text-parchment transition-colors"
                                     title="Toggle visibility">
                                 {% if campaign.visibility == "open" %}Make Private{% else %}Make Open{% endif %}
                             </button>
                         </form>
                         {% endif %}
                         <button onclick="showDeleteModal('campaign', {{ campaign.id }}, '{{ campaign.name }}')"
-                                class="text-red-800 hover:text-red-400 text-xs transition-colors">
+                                class="text-rust hover:text-rust text-xs transition-colors">
                             Delete
                         </button>
                         {% for s in active_sessions if s.campaign_id == campaign.id %}
@@ -270,7 +270,7 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-gray-500 italic">No campaigns yet. Create one and assign a character to begin!</p>
+        <p class="text-faded italic">No campaigns yet. Create one and assign a character to begin!</p>
         {% endif %}
     </div>
 </div>
@@ -279,9 +279,9 @@
 <div id="delete-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center hidden">
     <div class="parchment rounded-lg p-6 max-w-sm w-full mx-4">
         <h3 class="gold-text font-bold text-lg mb-2">Confirm Deletion</h3>
-        <p class="text-gray-400 text-sm mb-1">You are about to delete:</p>
+        <p class="text-faded text-sm mb-1">You are about to delete:</p>
         <p class="text-white font-bold mb-4" id="delete-target-name"></p>
-        <p class="text-gray-400 text-sm mb-4">Enter your password to confirm. This cannot be undone.</p>
+        <p class="text-faded text-sm mb-4">Enter your password to confirm. This cannot be undone.</p>
 
         <form id="delete-form" method="post" class="space-y-3">
             <input type="hidden" name="delete_type" id="delete-type">
@@ -291,7 +291,7 @@
                        placeholder="Enter your password"
                        class="action-input w-full rounded px-3 py-2">
             </div>
-            <div id="delete-error" class="bg-red-900/50 border border-red-700 rounded px-3 py-2 text-red-300 text-sm hidden"></div>
+            <div id="delete-error" class="bg-red-900/50 border border-red-700 rounded px-3 py-2 text-rust text-sm hidden"></div>
             <div class="flex gap-3">
                 <button type="button" onclick="hideDeleteModal()" class="btn-secondary flex-1 rounded py-2 text-sm font-bold">
                     Cancel

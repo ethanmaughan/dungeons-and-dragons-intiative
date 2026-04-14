@@ -8,19 +8,19 @@
         <h2 class="text-2xl gold-text mb-6 text-center">Enter the Realm</h2>
 
         {% if error %}
-        <div class="bg-red-900/50 border border-red-700 rounded px-4 py-2 mb-4 text-red-300 text-sm">
+        <div class="rounded px-4 py-2 mb-4 text-sm" style="background: rgba(139,58,26,0.3); border: 1px solid; border-color: #8b3a1a; color: #c85a4a;">
             {{ error }}
         </div>
         {% endif %}
 
         <form action="/auth/login" method="post" class="space-y-4">
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Username</label>
+                <label class="block text-sm text-faded mb-1">Username</label>
                 <input type="text" name="username" required autofocus
                        class="action-input w-full rounded px-3 py-2">
             </div>
             <div>
-                <label class="block text-sm text-gray-400 mb-1">Password</label>
+                <label class="block text-sm text-faded mb-1">Password</label>
                 <input type="password" name="password" required
                        class="action-input w-full rounded px-3 py-2">
             </div>
@@ -29,7 +29,7 @@
             </button>
         </form>
 
-        <p class="text-center text-gray-500 text-sm mt-6">
+        <p class="text-center text-faded text-sm mt-6">
             New adventurer? <a href="/register" class="gold-text hover:underline">Create an account</a>
         </p>
     </div>
