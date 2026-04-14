@@ -91,6 +91,42 @@ def _run_migrations():
             if "character_goals" not in existing:
                 conn.execute(text("ALTER TABLE characters ADD COLUMN character_goals TEXT"))
 
+    # Chapter: v2 story engine fields
+    if "chapters" in inspector.get_table_names():
+        existing = {col["name"] for col in inspector.get_columns("chapters")}
+        with engine.begin() as conn:
+            if "truth" not in existing:
+                conn.execute(text("ALTER TABLE chapters ADD COLUMN truth JSON DEFAULT '{}'"))
+            if "tone" not in existing:
+                conn.execute(text("ALTER TABLE chapters ADD COLUMN tone TEXT"))
+            if "resolution" not in existing:
+                conn.execute(text("ALTER TABLE chapters ADD COLUMN resolution JSON DEFAULT '{}'"))
+            if "next_chapter" not in existing:
+                conn.execute(text("ALTER TABLE chapters ADD COLUMN next_chapter INTEGER"))
+            if "branches" not in existing:
+                conn.execute(text("ALTER TABLE chapters ADD COLUMN branches JSON DEFAULT '[]'"))
+
+    # CampaignStory: flags for cross-chapter state
+    if "campaign_stories" in inspector.get_table_names():
+        existing = {col["name"] for col in inspector.get_columns("campaign_stories")}
+        with engine.begin() as conn:
+            if "flags" not in existing:
+                conn.execute(text("ALTER TABLE campaign_stories ADD COLUMN flags JSON DEFAULT '{}'"))
+
+    # StoryNPC: conditional dialogue
+    if "story_npcs" in inspector.get_table_names():
+        existing = {col["name"] for col in inspector.get_columns("story_npcs")}
+        with engine.begin() as conn:
+            if "conditional_dialogue" not in existing:
+                conn.execute(text("ALTER TABLE story_npcs ADD COLUMN conditional_dialogue JSON DEFAULT '[]'"))
+
+    # ChapterProgress: beats_completed
+    if "chapter_progress" in inspector.get_table_names():
+        existing = {col["name"] for col in inspector.get_columns("chapter_progress")}
+        with engine.begin() as conn:
+            if "beats_completed" not in existing:
+                conn.execute(text("ALTER TABLE chapter_progress ADD COLUMN beats_completed JSON DEFAULT '{}'"))
+
     # Player: add email, admin, and subscription fields
     if "players" in inspector.get_table_names():
         existing = {col["name"] for col in inspector.get_columns("players")}

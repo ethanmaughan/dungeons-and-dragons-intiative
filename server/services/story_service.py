@@ -1,4 +1,4 @@
-"""Story CRUD: import JSON stories, assign to campaigns, read chapter state."""
+"""Story CRUD: import JSON stories (v1 + v2), assign to campaigns, read chapter state."""
 
 import json
 from pathlib import Path
@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session as DBSession
 
 from server.db.models import (
+    Beat,
     Campaign,
     CampaignStory,
     Chapter,
@@ -22,17 +23,21 @@ STORIES_DIR = Path(__file__).parent.parent.parent / "data" / "stories"
 def import_story(filepath: str | Path, db: DBSession) -> StoryTemplate:
     """Import a story from a JSON file into the database.
 
+    Supports both v1 (objectives/events) and v2 (beats/truth/resolution) formats.
     If a story with the same slug already exists, updates it (increments version).
     """
     data = json.loads(Path(filepath).read_text())
+    story_version = data.get("version", 1)
 
     # Check for existing story
     existing = db.query(StoryTemplate).filter(StoryTemplate.slug == data["slug"]).first()
     if existing:
-        # Update version, delete old chapters (cascade would be cleaner but manual for now)
+        # Delete old chapters and all children
         for chapter in existing.chapters:
             for obj in chapter.objectives:
                 db.delete(obj)
+            for beat in chapter.beats:
+                db.delete(beat)
             for npc in chapter.story_npcs:
                 db.delete(npc)
             for event in chapter.story_events:
@@ -72,22 +77,50 @@ def import_story(filepath: str | Path, db: DBSession) -> StoryTemplate:
             dm_guidance=ch_data.get("dm_guidance", ""),
             opening_narration=ch_data.get("opening_narration"),
             transition_narration=ch_data.get("transition_narration"),
+            # v2 fields
+            truth=ch_data.get("truth", {}),
+            tone=ch_data.get("tone"),
+            resolution=ch_data.get("resolution", {}),
+            next_chapter=ch_data.get("next_chapter"),
+            branches=ch_data.get("branches", []),
         )
         db.add(chapter)
         db.flush()
 
-        for obj_data in ch_data.get("objectives", []):
-            db.add(Objective(
-                chapter_id=chapter.id,
-                key=obj_data["key"],
-                description=obj_data["description"],
-                hint=obj_data.get("hint", ""),
-                required=obj_data.get("required", True),
-                sort_order=obj_data.get("sort_order", 0),
-                detection_keywords=obj_data.get("detection_keywords", []),
-                detection_prompt=obj_data.get("detection_prompt"),
-            ))
+        # v2: import beats
+        if story_version >= 2 and "beats" in ch_data:
+            for i, beat_data in enumerate(ch_data.get("beats", [])):
+                db.add(Beat(
+                    chapter_id=chapter.id,
+                    key=beat_data["key"],
+                    description=beat_data["description"],
+                    required=beat_data.get("required", True),
+                    sort_order=beat_data.get("sort_order", i),
+                    prerequisites=beat_data.get("prerequisites", []),
+                    trigger=beat_data.get("trigger", "player_action"),
+                    trigger_condition=beat_data.get("trigger_condition"),
+                    detection_keywords=beat_data.get("detection_keywords", []),
+                    detection_prompt=beat_data.get("detection_prompt"),
+                    hint=beat_data.get("hint"),
+                    on_complete=beat_data.get("on_complete"),
+                    narration_hint=beat_data.get("narration_hint"),
+                    combat=beat_data.get("combat"),
+                ))
+        else:
+            # v1: import objectives (backward compat)
+            for obj_data in ch_data.get("objectives", []):
+                db.add(Objective(
+                    chapter_id=chapter.id,
+                    key=obj_data["key"],
+                    description=obj_data["description"],
+                    hint=obj_data.get("hint", ""),
+                    required=obj_data.get("required", True),
+                    sort_order=obj_data.get("sort_order", 0),
+                    detection_keywords=obj_data.get("detection_keywords", []),
+                    detection_prompt=obj_data.get("detection_prompt"),
+                ))
 
+        # NPCs (same for v1 and v2, with optional conditional_dialogue)
         for npc_data in ch_data.get("npcs", []):
             db.add(StoryNPC(
                 chapter_id=chapter.id,
@@ -100,17 +133,20 @@ def import_story(filepath: str | Path, db: DBSession) -> StoryTemplate:
                 appearance=npc_data.get("appearance", ""),
                 dialogue_hooks=npc_data.get("dialogue_hooks", []),
                 knowledge=npc_data.get("knowledge", []),
+                conditional_dialogue=npc_data.get("conditional_dialogue", []),
             ))
 
-        for event_data in ch_data.get("events", []):
-            db.add(StoryEvent(
-                chapter_id=chapter.id,
-                key=event_data["key"],
-                description=event_data["description"],
-                trigger=event_data.get("trigger", "dm_discretion"),
-                trigger_condition=event_data.get("trigger_condition"),
-                event_data=event_data.get("event_data", {}),
-            ))
+        # Events (v1 only — v2 merges events into beats)
+        if story_version < 2:
+            for event_data in ch_data.get("events", []):
+                db.add(StoryEvent(
+                    chapter_id=chapter.id,
+                    key=event_data["key"],
+                    description=event_data["description"],
+                    trigger=event_data.get("trigger", "dm_discretion"),
+                    trigger_condition=event_data.get("trigger_condition"),
+                    event_data=event_data.get("event_data", {}),
+                ))
 
     db.commit()
     return story
@@ -164,9 +200,10 @@ def assign_story(campaign_id: int, story_slug: str, db: DBSession) -> CampaignSt
 
 
 def get_current_chapter(campaign_id: int, db: DBSession) -> dict | None:
-    """Get the current chapter, its objectives, NPCs, events, and progress.
+    """Get the current chapter, its beats/objectives, NPCs, and progress.
 
     Returns None if the campaign has no assigned story.
+    Supports both v1 (objectives) and v2 (beats) formats.
     """
     cs = db.query(CampaignStory).filter(CampaignStory.campaign_id == campaign_id).first()
     if not cs:
@@ -192,9 +229,14 @@ def get_current_chapter(campaign_id: int, db: DBSession) -> dict | None:
         .first()
     )
 
-    completed = progress.objectives_completed if progress else {}
+    obj_completed = progress.objectives_completed if progress else {}
+    beats_completed = progress.beats_completed if progress else {}
+    campaign_flags = cs.flags or {}
 
-    return {
+    # Determine if this is a v2 chapter (has beats)
+    is_v2 = bool(chapter.beats)
+
+    result = {
         "story_title": cs.story.title,
         "story_slug": cs.story.slug,
         "chapter_number": chapter.chapter_number,
@@ -204,44 +246,102 @@ def get_current_chapter(campaign_id: int, db: DBSession) -> dict | None:
         "dm_guidance": chapter.dm_guidance,
         "opening_narration": chapter.opening_narration,
         "transition_narration": chapter.transition_narration,
-        "objectives": [
+        "chapter_summaries": cs.chapter_summaries or {},
+        "campaign_story_id": cs.id,
+        "status": cs.status,
+        "is_v2": is_v2,
+        # v2 fields
+        "truth": chapter.truth or {},
+        "tone": chapter.tone,
+        "resolution": chapter.resolution or {},
+        "next_chapter": chapter.next_chapter,
+        "branches": chapter.branches or [],
+        "flags": campaign_flags,
+    }
+
+    if is_v2:
+        result["beats"] = [
+            {
+                "key": beat.key,
+                "description": beat.description,
+                "required": beat.required,
+                "prerequisites": beat.prerequisites or [],
+                "trigger": beat.trigger,
+                "trigger_condition": beat.trigger_condition,
+                "detection_keywords": beat.detection_keywords or [],
+                "detection_prompt": beat.detection_prompt,
+                "hint": beat.hint,
+                "on_complete": beat.on_complete,
+                "narration_hint": beat.narration_hint,
+                "combat": beat.combat,
+                "completed": beats_completed.get(beat.key, {}).get("completed", False),
+            }
+            for beat in chapter.beats
+        ]
+        # Also populate objectives for backward compat in action_service
+        result["objectives"] = [
+            {
+                "key": b["key"],
+                "description": b["description"],
+                "hint": b["hint"],
+                "required": b["required"],
+                "completed": b["completed"],
+                "detection_keywords": b["detection_keywords"],
+                "detection_prompt": b["detection_prompt"],
+            }
+            for b in result["beats"]
+            if b["trigger"] == "player_action"
+        ]
+    else:
+        result["beats"] = []
+        result["objectives"] = [
             {
                 "key": obj.key,
                 "description": obj.description,
                 "hint": obj.hint,
                 "required": obj.required,
-                "completed": completed.get(obj.key, {}).get("completed", False),
+                "completed": obj_completed.get(obj.key, {}).get("completed", False),
                 "detection_keywords": obj.detection_keywords or [],
                 "detection_prompt": obj.detection_prompt,
             }
             for obj in chapter.objectives
-        ],
-        "npcs": [
-            {
-                "name": npc.name,
-                "role": npc.role,
-                "race": npc.race or "human",
-                "social_role": npc.social_role or "peasant",
-                "default_disposition": npc.default_disposition,
-                "story_npc_id": npc.id,
-                "personality": npc.personality,
-                "appearance": npc.appearance,
-                "dialogue_hooks": npc.dialogue_hooks or [],
-                "knowledge": npc.knowledge or [],
-            }
-            for npc in chapter.story_npcs
-        ],
-        "events": [
-            {
-                "key": event.key,
-                "description": event.description,
-                "trigger": event.trigger,
-                "trigger_condition": event.trigger_condition,
-                "event_data": event.event_data or {},
-            }
-            for event in chapter.story_events
-        ],
-        "chapter_summaries": cs.chapter_summaries or {},
-        "campaign_story_id": cs.id,
-        "status": cs.status,
-    }
+        ]
+
+    # NPCs with conditional dialogue filtered by active flags
+    result["npcs"] = []
+    for npc in chapter.story_npcs:
+        npc_data = {
+            "name": npc.name,
+            "role": npc.role,
+            "race": npc.race or "human",
+            "social_role": npc.social_role or "peasant",
+            "default_disposition": npc.default_disposition,
+            "story_npc_id": npc.id,
+            "personality": npc.personality,
+            "appearance": npc.appearance,
+            "dialogue_hooks": list(npc.dialogue_hooks or []),
+            "knowledge": npc.knowledge or [],
+        }
+        # Add conditional dialogue where flags are met
+        for cd in (npc.conditional_dialogue or []):
+            required_flag = cd.get("requires_flag", "")
+            if required_flag and campaign_flags.get(required_flag):
+                npc_data["dialogue_hooks"].append({
+                    "topic": cd["topic"],
+                    "response_guidance": cd["response_guidance"],
+                })
+        result["npcs"].append(npc_data)
+
+    # Events (v1 only)
+    result["events"] = [
+        {
+            "key": event.key,
+            "description": event.description,
+            "trigger": event.trigger,
+            "trigger_condition": event.trigger_condition,
+            "event_data": event.event_data or {},
+        }
+        for event in chapter.story_events
+    ]
+
+    return result

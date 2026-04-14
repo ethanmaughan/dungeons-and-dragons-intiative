@@ -471,33 +471,56 @@ async def process_action(
     db.commit()
 
     # ==========================================================
-    # MILESTONE CHECK — track story objective completion
+    # MILESTONE CHECK — track beat/objective completion
     # ==========================================================
     if _chapter_context and not is_character_creation and game_state.game_mode != "combat":
         from server.ai.story_engine import (
-            check_keyword_matches,
+            check_beat_completions,
             confirm_objective,
             mark_objective_complete,
+            process_beat_completion,
         )
         from server.services.story_service import get_current_chapter
         chapter_data = get_current_chapter(session.campaign_id, db)
         if chapter_data:
-            keyword_hits = check_keyword_matches(narration, action_text, chapter_data)
             recent_narrations = [
                 log.narration_text for log in recent_logs[-3:] if log.narration_text
             ] + [narration]
 
-            for obj in keyword_hits:
-                result = await confirm_objective(obj, recent_narrations, action_text)
-                if result.get("completed"):
-                    mark_objective_complete(
-                        chapter_data["campaign_story_id"],
-                        chapter_data["chapter_number"],
-                        obj["key"],
-                        result.get("summary", ""),
-                        turn_number,
-                        db,
-                    )
+            if chapter_data.get("is_v2"):
+                # v2: beat tracking with prerequisites, flags, auto-triggers
+                beat_hits = check_beat_completions(narration, action_text, chapter_data, db)
+                for beat in beat_hits:
+                    if beat.get("trigger") == "auto":
+                        # Auto beats complete without AI confirmation
+                        process_beat_completion(
+                            beat["key"],
+                            beat.get("description", "Auto-completed"),
+                            turn_number, chapter_data, db,
+                        )
+                    else:
+                        result = await confirm_objective(beat, recent_narrations, action_text)
+                        if result.get("completed"):
+                            process_beat_completion(
+                                beat["key"],
+                                result.get("summary", ""),
+                                turn_number, chapter_data, db,
+                            )
+            else:
+                # v1: legacy objective tracking
+                from server.ai.story_engine import check_keyword_matches
+                keyword_hits = check_keyword_matches(narration, action_text, chapter_data)
+                for obj in keyword_hits:
+                    result = await confirm_objective(obj, recent_narrations, action_text)
+                    if result.get("completed"):
+                        mark_objective_complete(
+                            chapter_data["campaign_story_id"],
+                            chapter_data["chapter_number"],
+                            obj["key"],
+                            result.get("summary", ""),
+                            turn_number,
+                            db,
+                        )
 
     # ==========================================================
     # NPC GUIDE — exploration only, guardrailed, cached for next turn
