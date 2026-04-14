@@ -90,6 +90,10 @@ async def websocket_session(ws: WebSocket, session_id: int):
             await ws.close()
             return
 
+        # Close the initial DB session — don't hold it during the listen loop
+        # Each action will open its own fresh session
+        db.close()
+
         # Register connection (we already accepted above, so use internal tracking)
         if session_id not in manager.active_connections:
             manager.active_connections[session_id] = []
