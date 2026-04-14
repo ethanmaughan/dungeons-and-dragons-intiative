@@ -410,6 +410,8 @@
     let sidebarOpen = false;
     let ws = null;
     let wsReconnectTimer = null;
+    let wsConnected = false;
+    let wsFailed = false;
     let actionPending = false;
     let currentGameMode = '{{ game_state.game_mode if game_state else "exploration" }}';
     let currentTurnCharId = {{ game_state.current_turn_character_id if game_state and game_state.current_turn_character_id else 'null' }};
@@ -417,7 +419,6 @@
     const SESSION_ID = {{ session.id }};
     const MY_CHARACTER_ID = {{ my_character.id if my_character else 'null' }};
 
-<<<<<<< HEAD
     // --- Combat Map ---
     let combatPositions = {};
     let mapCanvas = null;
@@ -662,14 +663,28 @@
         speechSynthesis.speak(utterance);
     }
 
-    // --- WebSocket ---
+    // --- WebSocket (with HTTP fallback) ---
     function connectWebSocket() {
+        if (wsFailed) return; // Don't retry if we already fell back to HTTP
+
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${location.host}/ws/session/${SESSION_ID}`);
 
+        // If WebSocket doesn't connect in 5 seconds, fall back to HTTP
+        const wsTimeout = setTimeout(() => {
+            if (!wsConnected) {
+                wsFailed = true;
+                ws.close();
+                document.getElementById('connection-status').textContent = 'HTTP Mode';
+                document.getElementById('connection-status').className = 'text-xs gold-text';
+            }
+        }, 5000);
+
         ws.onopen = function() {
+            clearTimeout(wsTimeout);
+            wsConnected = true;
             document.getElementById('connection-status').textContent = 'Connected';
-            document.getElementById('connection-status').className = 'text-xs text-green-500';
+            document.getElementById('connection-status').className = 'text-xs text-moss';
             if (wsReconnectTimer) {
                 clearTimeout(wsReconnectTimer);
                 wsReconnectTimer = null;
@@ -677,15 +692,22 @@
         };
 
         ws.onclose = function() {
-            document.getElementById('connection-status').textContent = 'Disconnected';
-            document.getElementById('connection-status').className = 'text-xs text-red-500';
-            // Auto-reconnect after 3 seconds
-            wsReconnectTimer = setTimeout(connectWebSocket, 3000);
+            wsConnected = false;
+            if (!wsFailed) {
+                document.getElementById('connection-status').textContent = 'Reconnecting...';
+                document.getElementById('connection-status').className = 'text-xs text-faded';
+                wsReconnectTimer = setTimeout(connectWebSocket, 3000);
+            }
         };
 
         ws.onerror = function() {
-            document.getElementById('connection-status').textContent = 'Error';
-            document.getElementById('connection-status').className = 'text-xs text-red-500';
+            clearTimeout(wsTimeout);
+            wsConnected = false;
+            if (!wsFailed) {
+                wsFailed = true;
+                document.getElementById('connection-status').textContent = 'HTTP Mode';
+                document.getElementById('connection-status').className = 'text-xs gold-text';
+            }
         };
 
         ws.onmessage = function(event) {
@@ -758,18 +780,66 @@
     function sendAction() {
         const input = document.getElementById('action-input');
         const text = input.value.trim();
-        if (!text || !ws || ws.readyState !== WebSocket.OPEN || actionPending) return;
+        if (!text || actionPending) return;
 
         actionPending = true;
         updateSendButton();
-
-        ws.send(JSON.stringify({
-            type: 'action',
-            text: text,
-        }));
-
         input.value = '';
+
+        // Try WebSocket first, fall back to HTTP
+        if (wsConnected && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'action', text: text }));
+        } else {
+            sendActionHTTP(text);
+        }
+
         input.focus();
+    }
+
+    async function sendActionHTTP(text) {
+        try {
+            const formData = new FormData();
+            formData.append('action', text);
+
+            const response = await fetch(`/api/action/${SESSION_ID}`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                appendNarrative(`<div class="text-rust text-sm italic p-2">${data.error}</div>`);
+                actionPending = false;
+                updateSendButton();
+                return;
+            }
+
+            // Render all narrative entries
+            for (const entry of (data.entries || [])) {
+                appendNarrative(entry.html);
+                if (entry.dice_rolls) {
+                    entry.dice_rolls.forEach((roll, i) => {
+                        setTimeout(() => showDiceToast(roll), i * 300);
+                    });
+                }
+            }
+
+            // Handle combat start
+            if (data.combat_start) {
+                showCombatStart(data.combat_start);
+            }
+
+            // Update state
+            if (data.characters) updateCharacterStates(data.characters);
+            if (data.game_state) updateGameState(data.game_state);
+
+        } catch (err) {
+            appendNarrative(`<div class="text-rust text-sm italic p-2">Connection error. Try again.</div>`);
+        }
+
+        actionPending = false;
+        updateSendButton();
     }
 
     function updateSendButton() {
