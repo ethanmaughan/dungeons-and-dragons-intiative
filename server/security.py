@@ -3,7 +3,6 @@
 from fastapi import HTTPException
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from starlette.middleware.base import BaseHTTPMiddleware
 
 
 limiter = Limiter(key_func=get_remote_address)
@@ -28,20 +27,47 @@ def require_admin(player):
         raise HTTPException(status_code=403, detail="Admin access required")
 
 
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com https://js.stripe.com; "
-            "style-src 'self' 'unsafe-inline'; "
-            "frame-src https://js.stripe.com; "
-            "connect-src 'self' wss: ws:; "
-            "img-src 'self' data: https:"
-        )
-        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
-        return response
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com https://js.stripe.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "frame-src https://js.stripe.com; "
+        "connect-src 'self' wss: ws:; "
+        "img-src 'self' data: https:"
+    ),
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+}
+
+
+class SecurityHeadersMiddleware:
+    """Pure ASGI middleware — does NOT use BaseHTTPMiddleware.
+
+    BaseHTTPMiddleware breaks WebSocket connections in Starlette/FastAPI.
+    This raw ASGI implementation only adds headers to HTTP responses,
+    passing WebSocket connections through untouched.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            # Pass WebSocket and lifespan through untouched
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = dict(message.get("headers", []))
+                for key, value in SECURITY_HEADERS.items():
+                    headers[key.lower().encode()] = value.encode()
+                message["headers"] = list(headers.items())
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
