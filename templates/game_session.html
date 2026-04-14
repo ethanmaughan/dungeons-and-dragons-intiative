@@ -111,7 +111,7 @@
             <span id="online-count" class="text-xs text-gray-500"></span>
             {% for c in characters %}
                 {% if not c.is_npc and not c.is_enemy %}
-                <a href="/character/{{ c.id }}" class="parchment rounded px-3 py-1 hover:border-yellow-700 transition-colors">
+                <a href="/character/{{ c.id }}" target="_blank" class="parchment rounded px-3 py-1 hover:border-yellow-700 transition-colors">
                     <span class="gold-text">{{ c.character_name }}</span>
                     <span class="text-red-400 ml-1" id="header-hp-{{ c.id }}">{{ c.hp_current }}/{{ c.hp_max }} HP</span>
                 </a>
@@ -137,8 +137,8 @@
                     &#127968; Dashboard
                 </a>
                 {% if my_character %}
-                <a href="/character/{{ my_character.id }}" class="block px-3 py-2 rounded text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors">
-                    &#128100; {{ my_character.character_name }}
+                <a href="/character/{{ my_character.id }}" target="_blank" class="block px-3 py-2 rounded text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors">
+                    &#128100; {{ my_character.character_name }} &#8599;
                 </a>
                 {% endif %}
             </nav>
