@@ -39,24 +39,46 @@
         background: #2d2418;
         border: 1px solid #d4a843;
         border-radius: 8px;
-        padding: 10px 16px;
+        padding: 12px 16px;
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
         color: #e8dcc8;
         font-family: 'Inter', sans-serif;
-        animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in 3.7s forwards;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        animation: toastIn 0.3s ease-out, toastOut 0.4s ease-in 4.6s forwards;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.6);
         pointer-events: auto;
-        min-width: 240px;
+        min-width: 260px;
     }
-    .dice-icon {
+    /* Animated dice face */
+    .dice-face {
+        width: 48px;
+        height: 48px;
+        border: 2px solid #d4a843;
+        border-radius: 8px;
+        background: #1a1408;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         font-family: 'Cinzel', serif;
         font-weight: 700;
-        font-size: 1.1rem;
+        font-size: 1.3rem;
         color: #d4a843;
-        min-width: 36px;
-        text-align: center;
+        flex-shrink: 0;
+        position: relative;
+        overflow: hidden;
+    }
+    .dice-face .dice-number {
+        animation: diceRoll 0.6s ease-out forwards;
+    }
+    .dice-face .dice-type {
+        position: absolute;
+        top: 2px;
+        right: 4px;
+        font-size: 0.5rem;
+        color: #6b5a3a;
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
     }
     .dice-result {
         font-family: 'Inter', sans-serif;
@@ -64,27 +86,67 @@
         font-size: 0.95rem;
     }
     .dice-outcome {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         color: #b8a898;
+        margin-top: 2px;
     }
+    /* Critical hit */
     .dice-toast.critical {
         border-color: #f0c050;
-        box-shadow: 0 0 20px rgba(240,192,80,0.4), 0 4px 12px rgba(0,0,0,0.5);
+        box-shadow: 0 0 25px rgba(240,192,80,0.5), 0 4px 16px rgba(0,0,0,0.5);
     }
-    .dice-toast.critical .dice-icon {
+    .dice-toast.critical .dice-face {
+        border-color: #f0c050;
+        background: #2a1e08;
+        animation: critGlow 1s ease-in-out;
+    }
+    .dice-toast.critical .dice-face .dice-number {
         color: #f0c050;
-        text-shadow: 0 0 10px rgba(240,192,80,0.6);
+        text-shadow: 0 0 12px rgba(240,192,80,0.8);
     }
+    /* Fumble */
     .dice-toast.fumble {
         border-color: #c85a4a;
-        box-shadow: 0 0 15px rgba(200,90,74,0.3);
+        box-shadow: 0 0 20px rgba(200,90,74,0.4);
     }
-    .dice-toast.fumble .dice-icon {
+    .dice-toast.fumble .dice-face {
+        border-color: #c85a4a;
+        animation: fumbleShake 0.5s ease-out;
+    }
+    .dice-toast.fumble .dice-face .dice-number {
         color: #c85a4a;
     }
+    /* Healing */
+    .dice-toast.healing .dice-face {
+        border-color: #5a8c4a;
+    }
+    .dice-toast.healing .dice-face .dice-number {
+        color: #5a8c4a;
+    }
+    /* Animations */
+    @keyframes diceRoll {
+        0% { transform: rotateX(0deg) scale(0.3); opacity: 0; }
+        30% { transform: rotateX(360deg) scale(1.2); opacity: 1; }
+        50% { transform: rotateX(540deg) scale(0.9); }
+        70% { transform: rotateX(640deg) scale(1.05); }
+        100% { transform: rotateX(720deg) scale(1); }
+    }
+    @keyframes critGlow {
+        0% { box-shadow: 0 0 5px rgba(240,192,80,0.3); }
+        50% { box-shadow: 0 0 30px rgba(240,192,80,0.8), inset 0 0 15px rgba(240,192,80,0.3); }
+        100% { box-shadow: 0 0 10px rgba(240,192,80,0.4); }
+    }
+    @keyframes fumbleShake {
+        0%, 100% { transform: rotate(0deg); }
+        15% { transform: rotate(-8deg); }
+        30% { transform: rotate(8deg); }
+        45% { transform: rotate(-5deg); }
+        60% { transform: rotate(5deg); }
+        75% { transform: rotate(-2deg); }
+    }
     @keyframes toastIn {
-        from { opacity: 0; transform: translateX(40px); }
-        to { opacity: 1; transform: translateX(0); }
+        from { opacity: 0; transform: translateX(50px) scale(0.9); }
+        to { opacity: 1; transform: translateX(0) scale(1); }
     }
     @keyframes toastOut {
         from { opacity: 1; }
@@ -884,34 +946,47 @@
         if (roll.critical) toast.classList.add('critical');
         if ((roll.type === 'player_attack' || roll.type === 'enemy_attack') && roll.roll === 1) toast.classList.add('fumble');
 
-        let icon = 'd20';
+        let dieType = 'd20';
+        let dieValue = roll.roll || roll.total || '?';
         let result = '';
         let outcome = '';
+        let extraClass = '';
 
         if (roll.type === 'player_attack' || roll.type === 'enemy_attack' || roll.type === 'spell_attack') {
+            dieValue = roll.roll;
             result = `${roll.roll} + ${roll.modifier} = ${roll.total}`;
             outcome = `vs AC ${roll.target_ac} — ${roll.hit ? 'Hit!' : 'Miss!'}`;
             if (roll.critical) outcome = 'CRITICAL HIT!';
             if (roll.roll === 1) outcome = 'FUMBLE!';
         } else if (roll.type === 'damage') {
-            icon = 'dmg';
+            dieType = 'dmg';
+            dieValue = roll.total;
             result = `${roll.total} damage`;
             if (roll.critical) result += ' (critical)';
         } else if (roll.type === 'saving_throw') {
+            dieValue = roll.roll;
             result = `${roll.roll} → ${roll.total}`;
             outcome = `DC ${roll.dc} — ${roll.success ? 'Saved!' : 'Failed!'}`;
         } else if (roll.type === 'healing') {
-            icon = 'heal';
-            result = `+${roll.total} HP`;
+            dieType = 'heal';
+            dieValue = `+${roll.total}`;
+            result = `+${roll.total} HP healed`;
+            extraClass = 'healing';
         } else if (roll.type === 'death_save') {
-            result = `Rolled ${roll.roll}`;
+            dieValue = roll.roll;
+            result = `Death Save`;
             outcome = roll.outcome || '';
         } else {
             return;
         }
 
+        if (extraClass) toast.classList.add(extraClass);
+
         toast.innerHTML = `
-            <div class="dice-icon">${icon}</div>
+            <div class="dice-face">
+                <span class="dice-type">${dieType}</span>
+                <span class="dice-number">${dieValue}</span>
+            </div>
             <div>
                 <div class="dice-result">${result}</div>
                 ${outcome ? `<div class="dice-outcome">${outcome}</div>` : ''}
@@ -919,7 +994,7 @@
         `;
 
         container.appendChild(toast);
-        setTimeout(() => toast.remove(), 4000);
+        setTimeout(() => toast.remove(), 5000);
     }
 
     function appendNarrative(html) {
