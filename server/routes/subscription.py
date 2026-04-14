@@ -29,7 +29,26 @@ def account_page(request: Request, db: DBSession = Depends(get_db)):
         return RedirectResponse(url="/login", status_code=303)
 
     reason = request.query_params.get("reason", "")
+    # Redirect subscription reasons to the subscription page
+    if reason == "subscription_required":
+        return RedirectResponse(url="/subscription?reason=subscription_required", status_code=303)
+
     return templates.TemplateResponse("account.html", {
+        "request": request,
+        "player": player,
+        "can_play": player_can_play(player),
+        "reason": reason,
+    })
+
+
+@router.get("/subscription")
+def subscription_page(request: Request, db: DBSession = Depends(get_db)):
+    player = get_current_player(request, db)
+    if not player:
+        return RedirectResponse(url="/login", status_code=303)
+
+    reason = request.query_params.get("reason", "")
+    return templates.TemplateResponse("subscription.html", {
         "request": request,
         "player": player,
         "can_play": player_can_play(player),

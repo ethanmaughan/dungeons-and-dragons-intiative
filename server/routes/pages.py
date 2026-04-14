@@ -266,7 +266,7 @@ def game_session(request: Request, session_id: int, db: DBSession = Depends(get_
     if not player:
         return RedirectResponse(url="/login", status_code=303)
     if not player_can_play(player):
-        return RedirectResponse(url="/account?reason=subscription_required", status_code=303)
+        return RedirectResponse(url="/subscription?reason=subscription_required", status_code=303)
 
     session = db.query(GameSession).filter(GameSession.id == session_id).first()
     if not session:

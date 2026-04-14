@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session as DBSession
 
 from server.auth import hash_password, verify_password, get_current_player
+from server.config import ADMIN_USERNAME
 from server.db.database import get_db
 from server.db.models import Campaign, Character, GameLog, GameState, JoinRequest, Player
 from server.db.models import Session as GameSession
@@ -61,6 +62,12 @@ def register(
     db.add(player)
     db.commit()
 
+    # Auto-comp admin on registration
+    if ADMIN_USERNAME and player.username == ADMIN_USERNAME:
+        player.is_admin = True
+        player.subscription_override = True
+        db.commit()
+
     # Log them in
     request.session["player_id"] = player.id
     return RedirectResponse(url="/dashboard", status_code=303)
@@ -79,6 +86,13 @@ def login(
             "request": request,
             "error": "Invalid username or password.",
         })
+
+    # Auto-comp admin on login
+    if ADMIN_USERNAME and player.username == ADMIN_USERNAME:
+        if not player.is_admin or not player.subscription_override:
+            player.is_admin = True
+            player.subscription_override = True
+            db.commit()
 
     request.session["player_id"] = player.id
     return RedirectResponse(url="/dashboard", status_code=303)

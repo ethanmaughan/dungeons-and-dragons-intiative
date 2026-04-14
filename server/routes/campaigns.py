@@ -40,7 +40,7 @@ def create_campaign(
     if not player:
         return RedirectResponse(url="/login", status_code=303)
     if not player_can_play(player):
-        return RedirectResponse(url="/account?reason=subscription_required", status_code=303)
+        return RedirectResponse(url="/subscription?reason=subscription_required", status_code=303)
 
     if visibility not in ("open", "private"):
         visibility = "open"
@@ -104,7 +104,7 @@ def join_campaign(
     if not player:
         return RedirectResponse(url="/login", status_code=303)
     if not player_can_play(player):
-        return RedirectResponse(url="/account?reason=subscription_required", status_code=303)
+        return RedirectResponse(url="/subscription?reason=subscription_required", status_code=303)
 
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
@@ -231,7 +231,7 @@ def join_by_code(
     if not player:
         return RedirectResponse(url="/login", status_code=303)
     if not player_can_play(player):
-        return RedirectResponse(url="/account?reason=subscription_required", status_code=303)
+        return RedirectResponse(url="/subscription?reason=subscription_required", status_code=303)
 
     code = invite_code.strip().upper()
     campaign = db.query(Campaign).filter(Campaign.invite_code == code).first()
