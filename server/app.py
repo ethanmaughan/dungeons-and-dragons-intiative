@@ -5,7 +5,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.sessions import SessionMiddleware
 
-from server.config import SECRET_KEY, ADMIN_USERNAME
+from server.config import SECRET_KEY, ADMIN_USERNAMES
 from server.db.database import create_tables
 from server.security import SecurityHeadersMiddleware, limiter
 from server.routes.pages import router as pages_router
@@ -59,14 +59,15 @@ def create_app() -> FastAPI:
         db = SessionLocal()
         try:
             import_all_stories(db)
-            # Seed admin user if configured
-            if ADMIN_USERNAME:
+            # Seed admin users if configured
+            if ADMIN_USERNAMES:
                 from server.db.models import Player
-                admin = db.query(Player).filter(Player.username == ADMIN_USERNAME).first()
-                if admin and (not admin.is_admin or not admin.subscription_override):
-                    admin.is_admin = True
-                    admin.subscription_override = True
-                    db.commit()
+                for uname in ADMIN_USERNAMES:
+                    admin = db.query(Player).filter(Player.username == uname).first()
+                    if admin and (not admin.is_admin or not admin.subscription_override):
+                        admin.is_admin = True
+                        admin.subscription_override = True
+                db.commit()
         finally:
             db.close()
 

@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session as DBSession
 
 from server.auth import hash_password, verify_password, get_current_player
-from server.config import ADMIN_USERNAME
+from server.config import ADMIN_USERNAMES
 from server.db.database import get_db
 from server.db.models import Campaign, Character, GameLog, GameState, JoinRequest, Player
 from server.db.models import Session as GameSession
@@ -63,7 +63,7 @@ def register(
     db.commit()
 
     # Auto-comp admin on registration
-    if ADMIN_USERNAME and player.username == ADMIN_USERNAME:
+    if player.username in ADMIN_USERNAMES:
         player.is_admin = True
         player.subscription_override = True
         db.commit()
@@ -88,7 +88,7 @@ def login(
         })
 
     # Auto-comp admin on login
-    if ADMIN_USERNAME and player.username == ADMIN_USERNAME:
+    if player.username in ADMIN_USERNAMES:
         if not player.is_admin or not player.subscription_override:
             player.is_admin = True
             player.subscription_override = True

@@ -18,6 +18,10 @@ STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "")
+# Comma-separated list of additional admin usernames
+ADMIN_USERNAMES = {u.strip() for u in os.getenv("ADMIN_USERNAMES", "").split(",") if u.strip()}
+if ADMIN_USERNAME:
+    ADMIN_USERNAMES.add(ADMIN_USERNAME)
 
 # AI backend: "ollama" (free, local) or "claude" (paid, better quality)
 AI_BACKEND = os.getenv("AI_BACKEND", "ollama")
