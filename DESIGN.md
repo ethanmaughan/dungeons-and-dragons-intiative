@@ -87,31 +87,34 @@ All art, maps, and campaign stories are human-created. The AI executes them live
 - [x] Server-side dice rolling engine
 - [x] Action tag system (GM embeds mechanical tags, server resolves them)
 - [x] Combat system with initiative and monster stat blocks
+- [x] Death saves
 - [x] Character profiles with avatar upload
 - [x] Text-to-speech narration
 - [x] Sidebar with character sheet, party status, navigation
-
-### Next
 - [x] Deploy to web (hosting + domain: foraygames.com)
 - [x] Rebrand UI to "Foray"
 - [x] Remove official campaign references
-- [ ] Multiplayer (WebSockets, shared sessions)
-- [ ] Subscription/payment system
-- [ ] Visual battle map with token movement
-- [ ] Original campaign content
-- [ ] Reputation system implementation
-- [ ] Adaptive antagonist system
+- [x] Multiplayer (WebSockets, shared sessions)
+- [x] Subscription/payment system (Stripe checkout, webhooks, billing portal)
+- [x] Visual battle map with token movement (canvas grid, token art, speed-based movement)
+- [x] Reputation system (Disposition engine — invisible NPC attitudes from demographics + behavior shifts)
+
+### Next
+- [ ] Original campaign content (only `tutorial` + `the_lost_temple` exist today)
+- [ ] Adaptive antagonist system (persistent villain adapting across sessions — foundation exists via enemy learning, but the campaign-villain agent is not built)
+- [ ] Persistent NPC agents (personality + memory + knowledge tiers; NPCs currently run through the GM, not dedicated agents)
 - [ ] Sound effects and ambient music
-- [ ] Mobile-responsive design
+- [ ] Mobile-responsive design (currently desktop-only — minimal responsive styling)
 
-### Future — Multi-Agent Architecture
-The current system uses a single GM agent for everything. The target architecture separates concerns:
+### Multi-Agent Combat Architecture — Mostly Built
+The single-GM model has been split into dedicated combat agents (`server/ai/`):
 
-- [ ] **GM Agent** — storyteller and world-builder. Introduces enemies, narrates scenes, manages plot. Does NOT control enemy combat actions directly.
-- [ ] **Combat Engine** — when the GM introduces an enemy, the system creates an autonomous entity with stats, behavior profile, and tactical preferences.
-- [ ] **Enemy Agents** — on their initiative turn, basic enemies (goblins, wolves) use rules-based Python logic (no API call). Boss enemies and villains get a dedicated Claude API call with tactical prompts for smart decision-making.
-- [ ] **NPC Agents** — persistent agents with personality, memory, and knowledge tiers. Claude API call with that NPC's data when the player interacts with them.
-- [ ] **Adaptive Antagonist** — the campaign's main villain is a persistent agent that tracks player actions across sessions and adapts strategy.
+- [x] **GM Agent** — storyteller and world-builder; narrates scenes and manages plot, does not micromanage enemy combat (`orchestrator.py`, `story_engine.py`).
+- [x] **Combat Engine** — autonomous encounter/turn resolution with stats and behavior profiles (`combat_orchestrator.py`, `combat_tracker.py`).
+- [x] **Enemy Agents** — basic enemies use rule-based Python (no API call); tougher enemies get a Claude (Haiku) call for personality/tactics, with rule-based fallback (`enemy_agent.py`, `behavior_classifier.py`).
+- [x] **Enemy learning** — per-species, cross-campaign player-pattern tracking (`tools/enemy_learning.py`).
+- [ ] **NPC Agents** — persistent agents with personality, memory, and knowledge tiers, invoked when the player interacts with that NPC. *(still GM-driven; see Next)*
+- [ ] **Adaptive Antagonist** — the campaign's main villain as a persistent agent that tracks player actions across sessions. *(still open; see Next)*
 
 This architecture means:
 - Enemy turns are instant (no waiting for API) for basic enemies
